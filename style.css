@@ -1,0 +1,63 @@
+/* ==========================================================================
+   Novum OS — Warm Color Themes & Aesthetic Minimalist Styling
+   ========================================================================== */
+
+/* Theme 1: Sage & Beige (Default) */
+body[data-theme="sage"], body:not([data-theme]) {
+    --novum-bg: #f4f3ef !important;
+    --novum-card: rgba(255, 255, 255, 0.85) !important;
+    --novum-border: rgba(107, 142, 128, 0.25) !important;
+    --novum-accent: #6b8e80 !important;
+    --novum-accent-glow: rgba(107, 142, 128, 0.15) !important;
+    --novum-text: #1a2420 !important;
+    --novum-subtext: #6e7e77 !important;
+}
+
+/* Theme 2: Sakura Kirschblüte */
+body[data-theme="rose"] {
+    --novum-bg: #fdf8f6 !important;
+    --novum-card: rgba(255, 255, 255, 0.85) !important;
+    --novum-border: rgba(225, 148, 164, 0.3) !important;
+    --novum-accent: #e194a4 !important;
+    --novum-accent-glow: rgba(225, 148, 164, 0.2) !important;
+    --novum-text: #2d1c20 !important;
+    --novum-subtext: #8c6870 !important;
+}
+
+/* Theme 3: Warm Dark */
+body[data-theme="dark"] {
+    --novum-bg: #121413 !important;
+    --novum-card: rgba(26, 30, 28, 0.85) !important;
+    --novum-border: rgba(255, 255, 255, 0.15) !important;
+    --novum-accent: #88a89b !important;
+    --novum-accent-glow: rgba(136, 168, 155, 0.25) !important;
+    --novum-text: #f0f2f1 !important;
+    --novum-subtext: #8e9e97 !important;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--novum-border);
+    border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--novum-accent);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
