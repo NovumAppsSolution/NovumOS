@@ -360,21 +360,22 @@ Generate a concise report in Markdown:
 `;
 
     if (openaiKey) {
+        /* Timeout auf 90000ms (90 Sekunden) erhöht */
         const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
-        }, 30000);
+        }, 90000);
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
         return data.choices[0].message.content;
     } else if (geminiKey) {
-        /* Nutze gemini-1.5-flash als stabiles Standardmodell */
-        const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+        /* Modellbezeichnung korrigiert auf gemini-2.5-flash & Timeout auf 90 Sek */
+        const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        }, 30000);
+        }, 90000);
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
         if (!data.candidates || !data.candidates[0]?.content) {
@@ -384,6 +385,7 @@ Generate a concise report in Markdown:
     }
     throw new Error('Kein OpenAI oder Gemini API Key im Profil hinterlegt.');
 }
+
 
 
 async function startLiveScan() {
