@@ -755,7 +755,7 @@ Benutzeranfrage: ${msg}
     }
 }
 
-/* --- SERVICE WORKER REGISTRATION FOR PWA --- */
+/* --- SERVICE WORKER REGISTRATION FOR PWA (RELATIVE PATH) --- */
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
