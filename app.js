@@ -4,7 +4,7 @@
    - Workspace Memory / Story Bible Integration
    - Instant Theme Switching (Sage, Rose, Dark)
    - Delete Functions (Workspaces & Reports)
-   - PWA Service Worker Registration
+   - PWA Service Worker & Web Notifications
    ========================================================================== */
 
 let activeReportForChat = null;
@@ -30,7 +30,24 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSavedApiKeys();
     renderWorkspaceUI();
     renderReports();
+    requestNotificationPermission();
 });
+
+/* --- NOTIFICATIONS SYSTEM --- */
+function requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+function sendNotification(title, body) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, {
+            body: body,
+            icon: './icon-192.png'
+        });
+    }
+}
 
 /* --- INITIAL LAUNCH ANIMATION --- */
 function runInitialAppLoader() {
@@ -262,7 +279,7 @@ function loadSavedApiKeys() {
     }
 }
 
-/* --- LIVE SCAN ENGINE --- */
+/* --- LIVE SCAN ENGINE WITH TIMEOUT SAFETIES --- */
 function updateScanProgress(percent, title, subtitle, logText) {
     document.getElementById('scan-progress-bar').style.width = `${percent}%`;
     document.getElementById('scan-step-title').textContent = title;
@@ -289,6 +306,26 @@ async function fetchSerperData(keyword, competitors = '') {
     return snippets.join('\n');
 }
 
+/* Fetch with Timeout Controller to prevent hanging at Step 2 */
+async function fetchWithTimeout(resource, options = {}, timeout = 45000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(resource, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+    } catch (err) {
+        clearTimeout(id);
+        if (err.name === 'AbortError') {
+            throw new Error('Zeitüberschreitung (Timeout): KI-Anfrage hat zu lange gedauert. Bitte erneut versuchen.');
+        }
+        throw err;
+    }
+}
+
 async function generateAIReport(title, rawData, customInstruction, isGlobal, previousContent, lang) {
     const openaiKey = localStorage.getItem('tw_key_openai');
     const geminiKey = localStorage.getItem('tw_key_gemini');
@@ -303,7 +340,7 @@ ${rawData}
 ${previousContent ? `PREVIOUS REPORT:\n${previousContent}` : ''}
 ${customInstruction ? `CUSTOM FOCUS: ${customInstruction}` : ''}
 
-Generate a report in Markdown:
+Generate a concise report in Markdown:
 # Executive Summary
 [Brief summary]
 
@@ -323,20 +360,20 @@ Generate a report in Markdown:
 `;
 
     if (openaiKey) {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
-        });
+        }, 45000);
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
         return data.choices[0].message.content;
     } else if (geminiKey) {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
+        const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
+        }, 45000);
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
         return data.candidates[0].content.parts[0].text;
@@ -347,6 +384,8 @@ Generate a report in Markdown:
 async function startLiveScan() {
     const serperKey = localStorage.getItem('tw_key_serper');
     if (!serperKey) { alert('Bitte hinterlege deinen Serper.dev API Key in Profil / Einstellungen.'); toggleProfileModal(); return; }
+
+    requestNotificationPermission();
 
     const customPrompt = document.getElementById('scan-custom-prompt').value.trim();
     const aiLang = document.getElementById('ai-response-lang').value;
@@ -393,6 +432,9 @@ async function startLiveScan() {
         allReports.unshift(newReport);
         localStorage.setItem('tw_reports', JSON.stringify(allReports));
 
+        /* Send Push Notification */
+        sendNotification('Novum OS — Market Intelligence', `Dein Analyse-Report "${reportTitle}" wurde erfolgreich fertiggestellt!`);
+
         setTimeout(() => {
             renderWorkspaceUI();
             renderReports();
@@ -400,7 +442,7 @@ async function startLiveScan() {
         }, 600);
 
     } catch (err) {
-        alert(`Fehler: ${err.message}`);
+        alert(`Fehler bei der Analyse: ${err.message}`);
         scanModal.classList.add('hidden');
     }
 }
@@ -626,7 +668,7 @@ async function executeHookGeneration() {
     try {
         let reply = "";
         if (openaiKey) {
-            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: fullPrompt }] })
@@ -634,7 +676,7 @@ async function executeHookGeneration() {
             const data = await res.json();
             reply = data.choices[0].message.content;
         } else if (geminiKey) {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
+            const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
@@ -725,7 +767,7 @@ Benutzeranfrage: ${msg}
     try {
         let reply = '';
         if (openaiKey) {
-            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -736,7 +778,7 @@ Benutzeranfrage: ${msg}
             const data = await res.json();
             reply = data.choices[0].message.content;
         } else if (geminiKey) {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
+            const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ contents: [{ parts: [{ text: fullSystemPrompt }] }] })
@@ -755,7 +797,7 @@ Benutzeranfrage: ${msg}
     }
 }
 
-/* --- SERVICE WORKER REGISTRATION FOR PWA (RELATIVE PATH) --- */
+/* --- SERVICE WORKER REGISTRATION FOR PWA --- */
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
