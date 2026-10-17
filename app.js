@@ -364,22 +364,27 @@ Generate a concise report in Markdown:
             method: 'POST',
             headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
-        }, 45000);
+        }, 30000);
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
         return data.choices[0].message.content;
     } else if (geminiKey) {
-        const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
+        /* Nutze gemini-1.5-flash als stabiles Standardmodell */
+        const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        }, 45000);
+        }, 30000);
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
+        if (!data.candidates || !data.candidates[0]?.content) {
+            throw new Error('Gemini hat keine gültige Antwort geliefert.');
+        }
         return data.candidates[0].content.parts[0].text;
     }
-    throw new Error('Kein OpenAI oder Gemini API Key hinterlegt.');
+    throw new Error('Kein OpenAI oder Gemini API Key im Profil hinterlegt.');
 }
+
 
 async function startLiveScan() {
     const serperKey = localStorage.getItem('tw_key_serper');
