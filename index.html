@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Novum OS — Market Intelligence & Story Studio</title>
+
+    <!-- PWA Web App Manifest & Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6b8e80">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Novum OS">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"DM Sans"', 'sans-serif']
+                    },
+                    colors: {
+                        novum: {
+                            bg: 'var(--novum-bg)',
+                            card: 'var(--novum-card)',
+                            border: 'var(--novum-border)',
+                            accent: 'var(--novum-accent)',
+                            accentGlow: 'var(--novum-accent-glow)',
+                            text: 'var(--novum-text)',
+                            subtext: 'var(--novum-subtext)'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Cache-Busting Parameter an style.css angefügt -->
+    <link rel="stylesheet" href="style.css?v=2.0">
+</head>
+<body class="bg-novum-bg text-novum-text font-sans min-h-screen flex flex-col antialiased selection:bg-novum-accent/30 pb-20 transition-colors duration-500" data-theme="sage">
+
+    <!-- NOVUM APP LAUNCHER / INITIAL LOADING ANIMATION -->
+    <div id="novum-app-loader" class="fixed inset-0 z-50 bg-[#121815] flex flex-col items-center justify-center transition-opacity duration-700">
+        <div class="relative flex flex-col items-center">
+            <div class="relative w-24 h-24 rounded-3xl bg-gradient-to-tr from-[#3a4d44] to-[#6b8e80] p-0.5 shadow-2xl shadow-[#6b8e80]/20 animate-pulse">
+                <div class="w-full h-full bg-[#121815] rounded-[22px] flex items-center justify-center border border-white/10">
+                    <span class="text-3xl font-extrabold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-[#a3be8c] via-[#88a89b] to-[#f4f3ef]">N</span>
+                </div>
+            </div>
+            
+            <h1 class="text-xl font-bold tracking-widest text-[#f4f3ef] mt-6 uppercase">NOVUM <span class="text-[#a3be8c] font-light">OS</span></h1>
+            <p class="text-xs text-[#8fa399] mt-1 font-mono tracking-wider">Autonomous Intelligence & Writing Assistant</p>
+
+            <div class="w-48 bg-white/10 rounded-full h-1 mt-8 overflow-hidden">
+                <div id="app-load-bar" class="bg-gradient-to-r from-[#6b8e80] to-[#a3be8c] h-full w-0 transition-all duration-1000"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Overlay & Drawer -->
+    <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/60 backdrop-blur-md z-40 hidden transition-opacity duration-300 opacity-0"></div>
+    
+    <aside id="sidebar-drawer" class="fixed top-0 left-0 bottom-0 w-80 bg-novum-card border-r border-novum-border z-40 transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col shadow-2xl backdrop-blur-2xl">
+        <div class="p-5 border-b border-novum-border flex items-center justify-between bg-black/5">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-2xl bg-novum-accent/20 border border-novum-accent/40 flex items-center justify-center text-novum-accent font-bold">
+                    N
+                </div>
+                <div>
+                    <h3 class="font-bold text-xs text-novum-text uppercase tracking-wider">Workspaces</h3>
+                    <p class="text-[10px] text-novum-subtext">Märkte & Buch-Projekte</p>
+                </div>
+            </div>
+            <button onclick="toggleSidebar()" class="text-novum-subtext hover:text-novum-text text-xl p-1">&times;</button>
+        </div>
+
+        <div class="flex-1 p-3 overflow-y-auto space-y-2" id="sidebar-workspace-list"></div>
+
+        <div class="p-4 border-t border-novum-border bg-black/5 space-y-2">
+            <button onclick="toggleNewWorkspaceModal(); toggleSidebar();" class="w-full py-3 px-4 rounded-2xl bg-novum-accent/20 hover:bg-novum-accent/30 border border-novum-accent/40 text-novum-accent font-semibold text-xs transition active:scale-95 flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                <span>Neuer Workspace</span>
+            </button>
+            <button onclick="showGeneralDashboard(); toggleSidebar();" class="w-full py-2.5 px-4 rounded-2xl bg-black/5 hover:bg-black/10 text-novum-text font-medium text-xs border border-novum-border transition active:scale-95 flex items-center justify-center gap-2">
+                <span>Global Overview</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Header Navigation -->
+    <header class="sticky top-0 z-30 px-5 py-3.5 bg-novum-bg/80 backdrop-blur-2xl border-b border-novum-border flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <button onclick="toggleSidebar()" class="w-10 h-10 rounded-2xl bg-novum-card border border-novum-border flex items-center justify-center active:scale-95 transition-transform shadow-sm">
+                <svg class="w-5 h-5 text-novum-text" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="flex items-center space-x-2">
+                <div class="w-7 h-7 rounded-xl bg-novum-accent/20 border border-novum-accent/40 flex items-center justify-center text-novum-accent font-bold text-xs">N</div>
+                <h1 class="font-bold text-base tracking-wider text-novum-text">NOVUM<span class="text-novum-accent font-light ml-1">OS</span></h1>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <button onclick="toggleProfileModal()" class="flex items-center space-x-2 bg-novum-card border border-novum-border p-1.5 pr-3 rounded-2xl active:scale-95 transition shadow-sm">
+                <div id="header-avatar" class="w-7 h-7 rounded-xl bg-novum-accent text-white font-bold text-xs flex items-center justify-center">A</div>
+                <span id="header-user-name" class="text-xs font-semibold text-novum-text max-w-[80px] truncate">Profil</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Application Container -->
+    <main class="flex-1 max-w-3xl w-full mx-auto px-4 pt-4 space-y-6">
+        
+        <!-- Hero Card -->
+        <div class="relative overflow-hidden rounded-[32px] bg-novum-card border border-novum-border p-6 shadow-xl backdrop-blur-2xl">
+            <div class="absolute -right-16 -top-16 w-56 h-56 bg-novum-accent/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div class="relative z-10 space-y-5">
+                <div class="flex items-center justify-between">
+                    <span id="ws-badge" class="text-[11px] font-semibold text-novum-accent uppercase tracking-widest bg-novum-accent/15 border border-novum-accent/30 px-3 py-1 rounded-full backdrop-blur-md">Global Intelligence</span>
+                    <span class="text-[11px] text-novum-subtext flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Active Scanner
+                    </span>
+                </div>
+
+                <div>
+                    <h2 id="ws-title" class="text-2xl font-bold tracking-tight text-novum-text">Executive Overview</h2>
+                    <p id="ws-keywords" class="text-novum-subtext text-xs mt-1 leading-relaxed">Wöchentliches Markt-Monitoring & KI-Delta-Analysen.</p>
+                </div>
+
+                <div class="bg-black/5 border border-novum-border rounded-2xl p-3.5 space-y-3 backdrop-blur-md">
+                    <div>
+                        <label class="block text-[10px] font-medium uppercase tracking-wider text-novum-subtext mb-1">Fokus / Custom Instruction:</label>
+                        <input type="text" id="scan-custom-prompt" placeholder="z.B. New Adult BookTok Tropes & Amazon Bestseller Shift..." class="w-full bg-transparent border-none text-xs text-novum-text placeholder-novum-subtext focus:outline-none">
+                    </div>
+                    <div class="pt-2 border-t border-novum-border/50 flex items-center justify-between">
+                        <span class="text-[10px] uppercase font-medium text-novum-subtext">Sprache:</span>
+                        <select id="ai-response-lang" class="bg-novum-card text-novum-text text-xs rounded-xl px-2.5 py-1 border border-novum-border focus:outline-none">
+                            <option value="de">Deutsch 🇩🇪</option>
+                            <option value="en">English 🇺🇸</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button onclick="startLiveScan()" class="py-3.5 rounded-2xl bg-novum-accent hover:opacity-90 text-white font-bold text-xs shadow-lg shadow-novum-accent/20 transition active:scale-[0.98] flex items-center justify-center space-x-2">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        <span>Agenten-Scan starten</span>
+                    </button>
+                    
+                    <button onclick="toggleStoryBibleModal()" class="py-3.5 px-3 rounded-2xl bg-black/5 hover:bg-black/10 border border-novum-border text-novum-text font-semibold text-xs transition active:scale-[0.98] flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4 text-novum-accent" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18c-2.305 0-4.408.867-6 2.292m0-14.25v14.25"/></svg>
+                        <span>Story Bible & Gedächtnis</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Stats -->
+        <div class="grid grid-cols-3 gap-3">
+            <div class="bg-novum-card border border-novum-border p-4 rounded-[24px] text-center backdrop-blur-xl shadow-sm">
+                <span class="text-[10px] font-medium text-novum-subtext uppercase">Workspaces</span>
+                <p id="stat-ws-count" class="text-xl font-bold text-novum-text mt-1">0</p>
+            </div>
+            <div class="bg-novum-card border border-novum-border p-4 rounded-[24px] text-center backdrop-blur-xl shadow-sm">
+                <span class="text-[10px] font-medium text-novum-subtext uppercase">Reports</span>
+                <p id="stat-report-count" class="text-xl font-bold text-novum-text mt-1">0</p>
+            </div>
+            <div class="bg-novum-card border border-novum-border p-4 rounded-[24px] text-center backdrop-blur-xl shadow-sm">
+                <span class="text-[10px] font-medium text-novum-subtext uppercase">Letzter Scan</span>
+                <p id="stat-last-scan" class="text-[11px] font-semibold text-novum-accent mt-1 truncate">Heute</p>
+            </div>
+        </div>
+
+        <!-- Reports Feed -->
+        <div class="space-y-3">
+            <div class="flex items-center justify-between px-1">
+                <h3 id="reports-section-title" class="text-xs font-semibold text-novum-subtext uppercase tracking-wider">Intelligence Reports</h3>
+                
+                <div class="flex items-center gap-2">
+                    <button onclick="exportWorkspaceBatchMarkdown()" class="text-[10px] bg-novum-card border border-novum-border text-novum-subtext hover:text-novum-text px-2.5 py-1 rounded-full transition shadow-sm font-medium flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 stroke-current" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 12L12 16.5m0 0l4.5-4.5M12 16.5V3"/></svg>
+                        <span>Batch Export</span>
+                    </button>
+                    <span id="report-count-badge" class="text-[10px] bg-novum-card border border-novum-border text-novum-subtext px-2.5 py-0.5 rounded-full shadow-sm">0 Reports</span>
+                </div>
+            </div>
+
+            <div class="relative">
+                <input type="text" id="search-reports" oninput="filterReports(this.value)" placeholder="In Reports, Plots & Trends suchen..." class="w-full bg-novum-card border border-novum-border rounded-2xl pl-9 pr-4 py-2.5 text-xs text-novum-text placeholder-novum-subtext focus:outline-none focus:border-novum-accent transition shadow-sm">
+                <svg class="w-4 h-4 text-novum-subtext absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+
+            <div id="reports-list" class="space-y-3"></div>
+        </div>
+    </main>
+
+    <!-- Floating Navigation Bar -->
+    <div class="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 bg-novum-card/90 border border-novum-border backdrop-blur-2xl px-7 py-2.5 rounded-full flex items-center space-x-8 shadow-2xl">
+        <button onclick="showGeneralDashboard()" class="text-novum-accent flex flex-col items-center space-y-0.5 active:scale-95 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            <span class="text-[9px] font-medium">Home</span>
+        </button>
+        <button onclick="toggleNewWorkspaceModal()" class="text-novum-subtext hover:text-novum-text flex flex-col items-center space-y-0.5 active:scale-95 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            <span class="text-[9px] font-medium">Neu</span>
+        </button>
+        <button onclick="toggleProfileModal()" class="text-novum-subtext hover:text-novum-text flex flex-col items-center space-y-0.5 active:scale-95 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+            <span class="text-[9px] font-medium">Profil</span>
+        </button>
+    </div>
+
+    <!-- MODALS -->
+
+    <!-- Story Bible Modal -->
+    <div id="story-bible-modal" class="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 hidden flex flex-col items-center justify-center p-3 sm:p-6">
+        <div class="bg-novum-card border border-novum-border rounded-[32px] max-w-2xl w-full h-[85vh] flex flex-col shadow-2xl overflow-hidden backdrop-blur-2xl">
+            <div class="p-4 border-b border-novum-border flex items-center justify-between bg-black/5">
+                <div>
+                    <h3 class="font-bold text-xs text-novum-text uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4 text-novum-accent" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18c-2.305 0-4.408.867-6 2.292m0-14.25v14.25"/></svg>
+                        <span>Workspace Memory & Story Bible</span>
+                    </h3>
+                    <p class="text-[10px] text-novum-subtext">Autorenstimme, Charaktere & Handlungs-Gedächtnis</p>
+                </div>
+                <button onclick="toggleStoryBibleModal()" class="text-novum-subtext hover:text-novum-text text-xl p-1">&times;</button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-5 flex-1 text-xs">
+                <div class="space-y-2 bg-black/5 p-4 rounded-2xl border border-novum-border">
+                    <label class="block font-bold text-novum-accent uppercase tracking-wider text-[11px]">Deine Autorenstimme & Stil-Regeln</label>
+                    <textarea id="sb-author-voice" rows="3" placeholder="z. B. Ich-Perspektive Präsens (POV Mia), hohes Erzähltempo, atmosphärisch-sinnlich..." class="w-full bg-black/5 border border-novum-border rounded-xl p-3 text-xs text-novum-text focus:outline-none focus:border-novum-accent resize-none"></textarea>
+                </div>
+
+                <div class="space-y-2 bg-black/5 p-4 rounded-2xl border border-novum-border">
+                    <label class="block font-bold text-novum-accent uppercase tracking-wider text-[11px]">Figuren & Schlüssel-Fakten (Story Bible)</label>
+                    <textarea id="sb-characters" rows="4" placeholder="z. B. Mia (21, Kunststudentin). Julian (23, verschlossen, Ex-Eishockeyspieler)..." class="w-full bg-black/5 border border-novum-border rounded-xl p-3 text-xs text-novum-text focus:outline-none focus:border-novum-accent resize-none"></textarea>
+                </div>
+
+                <div class="space-y-2 bg-black/5 p-4 rounded-2xl border border-novum-border">
+                    <label class="block font-bold text-novum-accent uppercase tracking-wider text-[11px]">Bisheriger Kapitel-Verlauf (Fortlaufendes Gedächtnis)</label>
+                    <textarea id="sb-plot-progress" rows="5" placeholder="Kapitel 1: Mia zieht ein und trifft Julian...&#10;Kapitel 2: Erste Vorlesung..." class="w-full bg-black/5 border border-novum-border rounded-xl p-3 text-xs text-novum-text focus:outline-none focus:border-novum-accent resize-none"></textarea>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-novum-border bg-black/5 flex justify-end space-x-2">
+                <button onclick="toggleStoryBibleModal()" class="px-4 py-2 rounded-xl bg-black/5 text-novum-subtext text-xs font-medium">Schließen</button>
+                <button onclick="saveStoryBible()" class="px-5 py-2 rounded-xl bg-novum-accent text-white font-bold text-xs shadow-md">Gedächtnis Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile & Theme Hub Modal -->
+    <div id="profile-modal" class="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-novum-card border border-novum-border rounded-[32px] max-w-md w-full p-6 space-y-5 shadow-2xl backdrop-blur-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-novum-border pb-3">
+                <h3 class="font-bold text-sm text-novum-text uppercase tracking-wider">Profil & System Hub</h3>
+                <button onclick="toggleProfileModal()" class="text-novum-subtext hover:text-novum-text text-xl p-1">&times;</button>
+            </div>
+
+            <div class="space-y-3 bg-black/5 p-4 rounded-2xl border border-novum-border">
+                <h4 class="text-xs font-bold text-novum-accent uppercase tracking-wider">Benutzerprofil</h4>
+                <div class="flex items-center space-x-3">
+                    <div id="modal-avatar" class="w-12 h-12 rounded-2xl bg-novum-accent text-white font-bold text-lg flex items-center justify-center shrink-0">A</div>
+                    <div class="flex-1 space-y-2">
+                        <input type="text" id="user-name-input" placeholder="Dein Name" class="w-full bg-black/5 border border-novum-border rounded-xl px-3 py-1.5 text-xs text-novum-text focus:outline-none focus:border-novum-accent">
+                        <input type="text" id="user-role-input" placeholder="Rolle (z.B. Autorin / Strategist)" class="w-full bg-black/5 border border-novum-border rounded-xl px-3 py-1.5 text-xs text-novum-text focus:outline-none focus:border-novum-accent">
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <h4 class="text-xs font-bold text-novum-accent uppercase tracking-wider">Design Theme wählen</h4>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" onclick="setTheme('sage')" class="p-3 rounded-2xl border border-black/10 bg-[#f4f3ef] hover:border-[#6b8e80] text-center space-y-1 transition active:scale-95 shadow-sm cursor-pointer">
+                        <div class="w-5 h-5 rounded-full bg-[#6b8e80] mx-auto"></div>
+                        <span class="block text-[10px] text-[#1a2420] font-medium">Sage & Beige</span>
+                    </button>
+                    <button type="button" onclick="setTheme('rose')" class="p-3 rounded-2xl border border-black/10 bg-[#fdf8f6] hover:border-[#e194a4] text-center space-y-1 transition active:scale-95 shadow-sm cursor-pointer">
+                        <div class="w-5 h-5 rounded-full bg-[#e194a4] mx-auto"></div>
+                        <span class="block text-[10px] text-[#2d1c20] font-medium">Kirschblüte</span>
+                    </button>
+                    <button type="button" onclick="setTheme('dark')" class="p-3 rounded-2xl border border-white/10 bg-[#121413] hover:border-[#88a89b] text-center space-y-1 transition active:scale-95 shadow-sm cursor-pointer">
+                        <div class="w-5 h-5 rounded-full bg-[#88a89b] mx-auto"></div>
+                        <span class="block text-[10px] text-white font-medium">Warm Dark</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <h4 class="text-xs font-bold text-novum-accent uppercase tracking-wider">API Konfiguration (BYOK)</h4>
+                <div>
+                    <label class="block text-[10px] font-semibold text-novum-subtext uppercase mb-1">Serper.dev API Key</label>
+                    <input type="password" id="key-serper" class="w-full bg-black/5 border border-novum-border rounded-xl px-3 py-2 text-xs text-novum-text focus:outline-none focus:border-novum-accent">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-novum-subtext uppercase mb-1">OpenAI API Key</label>
+                    <input type="password" id="key-openai" class="w-full bg-black/5 border border-novum-border rounded-xl px-3 py-2 text-xs text-novum-text focus:outline-none focus:border-novum-accent">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-novum-subtext uppercase mb-1">Google Gemini API Key</label>
+                    <input type="password" id="key-gemini" class="w-full bg-black/5 border border-novum-border rounded-xl px-3 py-2 text-xs text-novum-text focus:outline-none focus:border-novum-accent">
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-novum-border">
+                <button onclick="toggleProfileModal()" class="px-4 py-2 rounded-xl bg-black/5 text-novum-subtext text-xs font-medium">Schließen</button>
+                <button onclick="saveProfileAndKeys()" class="px-4 py-2 rounded-xl bg-novum-accent text-white font-bold text-xs">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Scanning Modal -->
+    <div id="scan-modal" class="fixed inset-0 bg-black/60 backdrop-blur-2xl z-50 hidden flex flex-col items-center justify-center p-6">
+        <div class="max-w-sm w-full bg-novum-card border border-novum-border rounded-[32px] p-6 shadow-2xl flex flex-col items-center text-center space-y-6">
+            <div class="relative w-28 h-28 flex items-center justify-center">
+                <div class="absolute inset-0 rounded-full border border-novum-accent/30 animate-ping"></div>
+                <div class="w-12 h-12 rounded-2xl bg-novum-accent/20 border border-novum-accent/40 flex items-center justify-center text-novum-accent font-bold text-xl animate-pulse">N</div>
+            </div>
+
+            <div class="space-y-1 w-full">
+                <h3 id="scan-step-title" class="text-novum-text font-bold text-sm tracking-tight">Novum Agent Scan...</h3>
+                <p id="scan-step-subtitle" class="text-novum-subtext text-xs font-mono">Querying web sources & live feeds</p>
+            </div>
+
+            <div class="w-full bg-black/10 border border-novum-border rounded-full h-2 overflow-hidden">
+                <div id="scan-progress-bar" class="bg-novum-accent h-full w-0 transition-all duration-500"></div>
+            </div>
+
+            <div class="w-full bg-black/5 border border-novum-border rounded-2xl p-3 text-[10px] font-mono text-novum-subtext text-left space-y-1 h-16 overflow-hidden">
+                <div class="text-novum-accent">&gt; GET google.serper.dev/search [Live Data]</div>
+                <div id="scan-log-line" class="text-novum-subtext truncate">&gt; Processing Novum LLM Model...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Workspace Modal -->
+    <div id="new-workspace-modal" class="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-novum-card border border-novum-border rounded-[32px] max-w-md w-full p-6 space-y-4 shadow-2xl backdrop-blur-2xl">
+            <div class="flex items-center justify-between border-b border-novum-border pb-3">
+                <h3 class="font-bold text-sm text-novum-text">Neuer Workspace</h3>
+                <button onclick="toggleNewWorkspaceModal()" class="text-novum-subtext hover:text-novum-text text-xl p-1">&times;</button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-semibold text-novum-subtext uppercase mb-1">Workspace Name</label>
+                    <input type="text" id="ws-new-name" placeholder="e.g. New Adult & Romance Books" class="w-full bg-black/5 border border-novum-border rounded-xl px-3 py-2 text-xs text-novum-text focus:outline-none focus:border-novum-accent">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-novum-subtext uppercase mb-1">Such-Keywords</label>
+                    <input type="text" id="ws-new-keywords" placeholder="e.g. Romance Bestseller BookTok Tropes Amazon DE" class="w-full bg-black/5 border border-novum-border rounded-xl px-3 py-2 text-xs text-novum-text focus:outline-none focus:border-novum-accent">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-novum-subtext uppercase mb-1">Competitor / Bestseller Radar</label>
+                    <input type="text" id="ws-new-competitors" placeholder="e.g. Colleen Hoover, Ana Huang, Piper Verlag" class="w-full bg-black/5 border border-novum-border rounded-xl px-3 py-2 text-xs text-novum-text focus:outline-none focus:border-novum-accent">
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 pt-3 border-t border-novum-border">
+                <button onclick="toggleNewWorkspaceModal()" class="px-4 py-2 rounded-xl bg-black/5 text-novum-subtext text-xs font-medium">Abbrechen</button>
+                <button onclick="createWorkspace()" class="px-4 py-2 rounded-xl bg-novum-accent text-white font-bold text-xs">Erstellen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Studio Modal -->
+    <div id="hooks-modal" class="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 hidden flex flex-col items-center justify-center p-4">
+        <div class="bg-novum-card border border-novum-border rounded-[32px] max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden backdrop-blur-2xl">
+            <div class="p-5 border-b border-novum-border flex items-center justify-between bg-black/5">
+                <div>
+                    <h3 class="font-bold text-sm text-novum-text uppercase tracking-wider">Content & Hook Studio</h3>
+                    <p class="text-[11px] text-novum-subtext mt-0.5">Automatisierte Hooks aus Markt-Insights</p>
+                </div>
+                <button onclick="closeHooksModal()" class="text-novum-subtext hover:text-novum-text text-xl p-1">&times;</button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-4 flex-1">
+                <div>
+                    <label class="block text-[10px] font-semibold uppercase text-novum-subtext mb-1.5">Format auswählen:</label>
+                    <select id="hook-format-type" class="w-full bg-black/5 border border-novum-border rounded-xl px-3 py-2 text-xs text-novum-text focus:outline-none focus:border-novum-accent">
+                        <option value="booktok">BookTok / Instagram Reel Skripte (3x POV & Tropes)</option>
+                        <option value="newsletter">Newsletter-Kampagne (Betreffs, Teaser & Call-to-Action)</option>
+                        <option value="blurb">Buch-Klappentext & Amazon-Hooks (Bestseller-Focus)</option>
+                        <option value="social">Social Media Ad Hooks & Karussell-Posts</option>
+                    </select>
+                </div>
+
+                <button onclick="executeHookGeneration()" class="w-full py-3 rounded-2xl bg-novum-accent text-white font-bold text-xs shadow-lg shadow-novum-accent/20 transition active:scale-[0.98]">
+                    Content generieren
+                </button>
+
+                <div id="hook-output-container" class="hidden space-y-2 pt-3 border-t border-novum-border">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold uppercase text-novum-accent">Generierter Content:</span>
+                        <button onclick="copyHooksToClipboard()" class="text-[10px] bg-black/5 border border-novum-border text-novum-subtext hover:text-novum-text px-2.5 py-1 rounded-lg transition">Kopieren</button>
+                    </div>
+                    <div id="hook-output-text" class="bg-black/5 border border-novum-border rounded-2xl p-4 text-xs text-novum-text whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto font-sans"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Chat Modal -->
+    <div id="chat-modal" class="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 hidden flex flex-col items-center justify-center p-3 sm:p-6">
+        <div class="bg-novum-card border border-novum-border rounded-[32px] max-w-2xl w-full h-[85vh] flex flex-col shadow-2xl overflow-hidden backdrop-blur-2xl">
+            <div class="p-4 border-b border-novum-border flex items-center justify-between bg-black/5">
+                <div>
+                    <h3 id="chat-report-title" class="font-bold text-xs text-novum-text uppercase tracking-wider">Novum Intelligence & Co-Writer Chat</h3>
+                    <p class="text-[10px] text-novum-subtext">Contextual Intelligence & Story Assistant</p>
+                </div>
+                <button onclick="closeChatModal()" class="text-novum-subtext hover:text-novum-text text-xl p-1">&times;</button>
+            </div>
+            
+            <div class="px-4 py-2 bg-black/5 border-b border-novum-border flex items-center justify-between">
+                <span class="text-[10px] font-semibold text-novum-subtext uppercase tracking-wider">Arbeitsstärke / Intensität:</span>
+                <select id="chat-intensity" class="bg-novum-card text-novum-text text-[11px] rounded-xl px-2.5 py-1 border border-novum-border focus:outline-none cursor-pointer">
+                    <option value="quick">Express (Kurz & Bündig)</option>
+                    <option value="standard" selected>Standard Strategist</option>
+                    <option value="deep">Deep Dive (Max. Tiefe, Story & Romanstil)</option>
+                </select>
+            </div>
+
+            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 text-xs leading-relaxed"></div>
+            <div class="p-3 border-t border-novum-border bg-black/5 flex items-center gap-2">
+                <input type="text" id="chat-input" placeholder="Frage stellen oder Kapitel anweisen..." class="flex-1 bg-black/5 border border-novum-border rounded-2xl px-4 py-2.5 text-xs text-novum-text focus:outline-none focus:border-novum-accent">
+                <button onclick="sendChatMessage()" class="px-4 py-2.5 rounded-2xl bg-novum-accent text-white font-bold text-xs active:scale-95 transition">Senden</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
