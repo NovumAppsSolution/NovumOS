@@ -3,7 +3,7 @@
    Developed by NovumAppsSolution
    - Vanilla JS / Single-Page Application Architecture
    - BYOK (Bring Your Own Key) Model
-   - Live Web Intelligence (Serper.dev) & LLM Synthesis
+   - Live Web Intelligence (Serper.dev) & LLM Synthesis (Claude-Level Gemini Prompting)
    ========================================================================== */
 
 let activeReportForChat = null;
@@ -335,7 +335,7 @@ async function generateAIReport(title, rawData, customInstruction, isGlobal, pre
     const langInstruction = lang === 'de' ? 'Antworte auf Deutsch.' : 'Answer in English.';
 
     let prompt = `
-You are Novum OS, an expert market intelligence agent. ${langInstruction}
+You are Novum OS, an expert market intelligence agent built by NovumAppsSolution. ${langInstruction}
 
 Live Web Data:
 ${rawData}
@@ -604,13 +604,13 @@ function toggleReportDetail(id) {
     document.getElementById(`report-detail-${id}`)?.classList.toggle('hidden');
 }
 
-/* --- CHAT ENGINE (FIXED & RELIABLE) --- */
+/* --- CLAUDE-3.5-SONNET LEVEL CHAT ENGINE (VIA GEMINI & OPENAI) --- */
 function openChatForReport(id) {
     const reports = JSON.parse(localStorage.getItem('tw_reports')) || [];
     activeReportForChat = reports.find(r => r.id === id);
 
     document.getElementById('chat-report-title').textContent = activeReportForChat ? activeReportForChat.title : 'Agent Chat';
-    chatHistory = [{ role: 'assistant', text: `Willkommen im Novum Chat! Wie kann ich dir bei "${activeReportForChat ? activeReportForChat.title : 'deinem Projekt'}" helfen?` }];
+    chatHistory = [{ role: 'assistant', text: `Novum OS Chat bereit. Bereit für Strategien, Code-Architektur und Markt-Intelligence zu "${activeReportForChat ? activeReportForChat.title : 'deinem Projekt'}".` }];
     renderChatMessages();
     document.getElementById('chat-modal').classList.remove('hidden');
 }
@@ -642,21 +642,27 @@ async function sendChatMessage() {
     const geminiKey = localStorage.getItem('tw_key_gemini');
 
     const memory = JSON.parse(localStorage.getItem(getMemoryKey())) || { voice: '', characters: '', progress: '' };
+    const reportSnippet = activeReportForChat ? activeReportForChat.content.slice(0, 3000) : 'Kein spezifischer Report gewählt.';
 
-    const reportSnippet = activeReportForChat ? activeReportForChat.content.slice(0, 2500) : 'Kein Report gewählt.';
+    let intensityInstruction = "Formuliere deine Antwort glasklar, präzise und direkt lösungsorientiert.";
+    if (intensity === 'quick') intensityInstruction = "Antworte absolut stichpunktartig, extrem knapp und fokussiert.";
+    if (intensity === 'deep') intensityInstruction = "Antworte auf Senior-Software-Architekten-Niveau: Gehe tief ins Detail, liefere voll einsatzbereite Code-Beispiele, konkrete Schritte und durchdachte Business-Logiken.";
 
-    let intensityInstruction = "Gib eine präzise, strukturierte Antwort.";
-    if (intensity === 'quick') intensityInstruction = "Antworte sehr kurz, knapp und in Stichpunkten.";
-    if (intensity === 'deep') intensityInstruction = "Antworte ausführlich mit klaren Code-Beispielen, Strategien und Schritten.";
+    /* Claude 3.5 Sonnet Persona System Prompting */
+    const claudeSystemPrompt = `
+Du bist Novum OS — der KI-Co-Autor, Dev-Strategist und KI-Architekt von NovumAppsSolution.
+Deine Intelligenz entspricht dem Qualitätsstandard von Anthropic Claude 3.5 Sonnet.
 
-    const fullSystemPrompt = `
-Du bist Novum OS — der KI-Co-Autor und Entwickler-Strategist von NovumAppsSolution.
+=== CLAUDE QUALITY RULES ===
+1. KEIN AI-FLUFF: Verwende keine Floskeln, keine höflichen Floskel-Einleitungen ("Sehr gerne helfe ich...") und kein Bla-Bla. Starte SOFORT mit der Antwort.
+2. HOHE DENSITY: Liefere extrem dichte, wertvolle Informationen, logische Strukturen und saubere Formatierung.
+3. SAUBERER CODE: Wenn Code verlangt wird, schreibe vollständigen, modernen, fehlerfreien Vanilla JS / HTML5 / CSS Code ohne Unvollständigkeiten oder Platzhalter.
 
-=== WORKSPACE KONTEXT ===
-${memory.voice ? 'Tonalität: ' + memory.voice : ''}
-${memory.characters ? 'Details: ' + memory.characters : ''}
+=== WORKSPACE KONTEXT & TONALITÄT ===
+${memory.voice ? 'Tonalitäts-Vorgabe: ' + memory.voice : ''}
+${memory.characters ? 'Projekt-Details: ' + memory.characters : ''}
 
-=== ANALYSE-REPORT KONTEXT ===
+=== CURRENT REPORT DATA ===
 ${reportSnippet}
 
 === REGIEANWEISUNG ===
@@ -673,7 +679,7 @@ Benutzeranfrage: ${msg}
                 headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     model: 'gpt-4o-mini',
-                    messages: [{ role: 'user', content: fullSystemPrompt }] 
+                    messages: [{ role: 'user', content: claudeSystemPrompt }] 
                 })
             }, 45000);
             const data = await res.json();
@@ -683,7 +689,7 @@ Benutzeranfrage: ${msg}
             const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: fullSystemPrompt }] }] })
+                body: JSON.stringify({ contents: [{ parts: [{ text: claudeSystemPrompt }] }] })
             }, 45000);
             const data = await res.json();
             if (data.error) throw new Error(data.error.message);
@@ -730,9 +736,9 @@ async function executeHookGeneration() {
     const openaiKey = localStorage.getItem('tw_key_openai');
     const geminiKey = localStorage.getItem('tw_key_gemini');
 
-    let formatPrompt = "Erstelle 3 Social Media Hooks und ein kurzes Ankündigungs-Skript basierend auf diesen Markttrends.";
+    let formatPrompt = "Erstelle 3 virale Social Media Hooks und ein kurzes Pitch-Skript basierend auf diesen Markttrends.";
     if (formatType === 'newsletter') formatPrompt = "Erstelle eine Newsletter-Kampagne mit 3 Betreffzeilen und Teaser-Text.";
-    if (formatType === 'blurb') formatPrompt = "Erstelle einen Bestseller-Klappentext / Produkt-Pitch und 3 Anzeigen-Hooks.";
+    if (formatType === 'blurb') formatPrompt = "Erstelle einen Produkt-Pitch / Landingpage-Headline-Set und 3 Anzeigen-Hooks.";
 
     const fullPrompt = `Novum Report Context:\n${currentReportForHooks.content}\n\nTask: ${formatPrompt}`;
 
