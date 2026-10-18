@@ -366,6 +366,9 @@ async function startLiveScan() {
     const scanModal = document.getElementById('scan-modal');
     scanModal.classList.remove('hidden');
 
+    // ⏱️ Countdown für ca. 20 Sekunden starten
+    startScanCountdown(20);
+
     try {
         updateScanProgress(25, 'Phase 1: Retrieval', 'Serper.dev Web-Suche läuft...', 'Sammle Live-Daten...');
         
@@ -392,6 +395,8 @@ async function startLiveScan() {
 
         updateScanProgress(100, 'Phase 3: Speichern', 'Report erstellt.', 'Speichere Daten...');
 
+        stopScanCountdown(); // 🛑 Timer stoppen
+
         const newReport = {
             id: Date.now().toString(),
             workspaceId: currentWorkspaceId,
@@ -414,10 +419,12 @@ async function startLiveScan() {
         }, 600);
 
     } catch (err) {
+        stopScanCountdown(); // 🛑 Timer bei Fehler stoppen
         alert(`Fehler: ${err.message}`);
         scanModal.classList.add('hidden');
     }
 }
+
 
 /* --- REPORTS FEED & NOTES --- */
 function calculateVolatilityScore(content) {
@@ -612,3 +619,34 @@ if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW error', err));
     });
 }
+
+let scanTimerInterval = null;
+
+function startScanCountdown(seconds = 20) {
+    let timeLeft = seconds;
+    const timerEl = document.getElementById('scan-timer-display');
+    
+    if (timerEl) {
+        timerEl.textContent = `Geschätzte Dauer: ca. ${timeLeft}s`;
+    }
+
+    clearInterval(scanTimerInterval); // Falls noch ein alter Timer läuft
+    scanTimerInterval = setInterval(() => {
+        timeLeft--;
+        if (timerEl) {
+            if (timeLeft > 0) {
+                timerEl.textContent = `Geschätzte Dauer: ca. ${timeLeft}s`;
+            } else {
+                timerEl.textContent = `Wird fertiggestellt...`;
+            }
+        }
+        if (timeLeft <= 0) {
+            clearInterval(scanTimerInterval);
+        }
+    }, 1000);
+}
+
+function stopScanCountdown() {
+    clearInterval(scanTimerInterval);
+}
+
