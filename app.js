@@ -261,7 +261,7 @@ function createWorkspace() {
     document.getElementById('ws-new-keywords').value = '';
 }
 
-/* --- UNIVERSAL AI CORE (GEMINI-3.8-FLASH & OPENAI) --- */
+/* --- UNIVERSAL AI CORE (GEMINI-2.5-FLASH & OPENAI) --- */
 async function fetchWithTimeout(resource, options = {}, timeout = 60000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
@@ -290,8 +290,8 @@ async function callAI(promptText, maxTime = 60000) {
         if (data.error) throw new Error(data.error.message);
         return data.choices[0].message.content;
     } else if (geminiKey) {
-        /* Aktuelles, stabiles Gemini 3.8 Flash Modell */
-        const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
+        /* Das stabile, unterstützte Gemini 2.5 Flash Modell */
+        const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
