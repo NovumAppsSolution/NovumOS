@@ -739,33 +739,28 @@ async function sendChatMessage() {
 
     const memory = JSON.parse(localStorage.getItem(getMemoryKey())) || { voice: '', characters: '', progress: '' };
 
-    let intensityInstruction = "";
+    // Kürze den Report-Inhalt leicht, um Payload-Errors / Rate-Limits zu verhindern
+    const reportSnippet = activeReportForChat ? activeReportForChat.content.slice(0, 3000) : 'Kein Report gewählt.';
+
+    let intensityInstruction = "Gib eine präzise, lösungsorientierte Antwort.";
     if (intensity === 'quick') {
-        intensityInstruction = "Antworte prägnant, strukturiert und auf den Punkt.";
+        intensityInstruction = "Antworte sehr kurz, knapp und in Stichpunkten.";
     } else if (intensity === 'deep') {
-        intensityInstruction = "Schreibe im vollen, immersiven Romanstil. Achte auf flüssigen Lesefluss, tiefgründige Emotionen, feine Sinneswahrnehmungen (Show Don't Tell) und schlagfertige Dialoge.";
-    } else {
-        intensityInstruction = "Gib eine ausgewogene, gut geschriebene Antwort.";
+        intensityInstruction = "Antworte ausführlich, detailliert und tiefgehend mit konkreten Praxisbeispielen.";
     }
 
     const fullSystemPrompt = `
-Du bist Novum OS — der persönliche Co-Autor und Strategie-Agent dieses Workspaces.
+Du bist Novum OS — der persönliche Co-Autor, Dev-Strategist und KI-Agent.
 
-=== AUTORENSTIMME & STIL-REGELN ===
-${memory.voice || 'Keine spezifische Stimme hinterlegt. Schreibe lebendig und immersiv.'}
+=== WORKSPACE MEMORY / KONTEXT ===
+${memory.voice ? 'Vorgaben / Tonalität: ' + memory.voice : ''}
+${memory.characters ? 'Spezifikationen / Details: ' + memory.characters : ''}
 
-=== STORY BIBLE & CHARAKTERE ===
-${memory.characters || 'Keine Charakter-Details hinterlegt.'}
-
-=== BISHERIGER HANDLUNGSVERLAUF (BISHER GEGESCHRIEBENE KAPITEL) ===
-${memory.progress || 'Bisher kein Kapitel-Verlauf dokumentiert.'}
-
-=== AKTUELLE REPORT-MARKTDATEN ===
-${activeReportForChat ? activeReportForChat.content : 'Kein spezifischer Report ausgewählt.'}
+=== ANALYSE-REPORT KONTEXT ===
+${reportSnippet}
 
 === REGIEANWEISUNG ===
 ${intensityInstruction}
-Halte dich strikt an die Tonalität der Autorenstimme und den bisherigen Handlungsverlauf. Knüpfe nahtlos daran an.
 
 Benutzeranfrage: ${msg}
 `;
@@ -777,37 +772,35 @@ Benutzeranfrage: ${msg}
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    model: intensity === 'deep' ? 'gpt-4o' : 'gpt-4o-mini',
+                    model: 'gpt-4o-mini',
                     messages: [{ role: 'user', content: fullSystemPrompt }] 
                 })
-            });
+            }, 45000);
             const data = await res.json();
+            if (data.error) throw new Error(data.error.message);
             reply = data.choices[0].message.content;
         } else if (geminiKey) {
-            const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
+            // Nutzt gemini-1.5-flash für maximale Stabilität im Chat
+            const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ contents: [{ parts: [{ text: fullSystemPrompt }] }] })
-            });
+            }, 45000);
             const data = await res.json();
+            if (data.error) throw new Error(data.error.message);
+            if (!data.candidates || !data.candidates[0]?.content) {
+                throw new Error('Gemini hat keine Antwort geliefert.');
+            }
             reply = data.candidates[0].content.parts[0].text;
         } else { 
-            reply = 'Bitte hinterlege deine API-Schlüssel im Profil.'; 
+            reply = 'Bitte hinterlege deine API-Schlüssel (OpenAI oder Gemini) im Profil.'; 
         }
 
         chatHistory.push({ role: 'assistant', text: reply });
         renderChatMessages();
     } catch (err) {
-        chatHistory.push({ role: 'assistant', text: `Fehler: ${err.message}` });
+        console.error("Chat Error:", err);
+        chatHistory.push({ role: 'assistant', text: `⚠️ Fehler beim Antworten: ${err.message}` });
         renderChatMessages();
     }
-}
-
-/* --- SERVICE WORKER REGISTRATION FOR PWA --- */
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then((reg) => console.log('Novum OS PWA Service Worker aktiv:', reg.scope))
-            .catch((err) => console.error('Service Worker Fehler:', err));
-    });
 }
