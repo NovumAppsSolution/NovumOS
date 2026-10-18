@@ -261,7 +261,7 @@ function createWorkspace() {
     document.getElementById('ws-new-keywords').value = '';
 }
 
-/* --- UNIVERSAL AI CORE (GEMINI / OPENAI) --- */
+/* --- UNIVERSAL AI CORE (GEMINI-2.0-FLASH & OPENAI) --- */
 async function fetchWithTimeout(resource, options = {}, timeout = 60000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
@@ -290,15 +290,15 @@ async function callAI(promptText, maxTime = 60000) {
         if (data.error) throw new Error(data.error.message);
         return data.choices[0].message.content;
     } else if (geminiKey) {
-        // Universeller Fallback auf Gemini API v1 (stabile Endpunkte)
-        const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+        /* Aktueller, offizieller Gemini 2.0 Flash Endpunkt */
+        const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
         }, maxTime);
         const data = await res.json();
         if (data.error) throw new Error(data.error.message);
-        if (!data.candidates || !data.candidates[0]?.content) throw new Error('Keine Antwort von Gemini.');
+        if (!data.candidates || !data.candidates[0]?.content) throw new Error('Keine Antwort von Gemini erhalten.');
         return data.candidates[0].content.parts[0].text;
     }
     throw new Error('Kein OpenAI oder Gemini API Key im Profil hinterlegt.');
@@ -357,7 +357,7 @@ async function startLiveScan() {
         updateScanProgress(65, 'Phase 2: LLM Synthesis', 'Verarbeitung via Novum Engine...', 'Generiere SWOT Matrix...');
 
         const langInst = aiLang === 'de' ? 'Antworte auf Deutsch.' : 'Answer in English.';
-        const prompt = `You are Novum OS, expert intelligence agent. ${langInst}\n\nData:\n${rawData}\n\n${customPrompt ? 'Focus: ' + customPrompt : ''}\n\nMarkdown Report:\n# Executive Summary\n[Summary]\n\n# SWOT Matrix\n### Strengths & Opportunities (Chancen)\n- [Point]\n### Weaknesses & Threats (Risiken)\n- [Point]\n\n# Quick-Win Action Items (Top 3)\n1. [Item]\n2. [Item]\n3. [Item]`;
+        const prompt = `You are Novum OS, expert intelligence agent by NovumAppsSolution. ${langInst}\n\nData:\n${rawData}\n\n${customPrompt ? 'Focus: ' + customPrompt : ''}\n\nMarkdown Report:\n# Executive Summary\n[Summary]\n\n# SWOT Matrix\n### Strengths & Opportunities (Chancen)\n- [Point]\n### Weaknesses & Threats (Risiken)\n- [Point]\n\n# Quick-Win Action Items (Top 3)\n1. [Item]\n2. [Item]\n3. [Item]`;
 
         const aiReport = await callAI(prompt, 60000);
 
@@ -489,7 +489,7 @@ function renderReports() {
 
 function toggleReportDetail(id) { document.getElementById(`report-detail-${id}`)?.classList.toggle('hidden'); }
 
-/* --- CLAUDE-LEVEL CHAT ENGINE --- */
+/* --- CLAUDE-3.5-SONNET LEVEL CHAT ENGINE --- */
 function openChatForReport(id) {
     const reports = JSON.parse(localStorage.getItem('tw_reports')) || [];
     activeReportForChat = reports.find(r => r.id === id);
