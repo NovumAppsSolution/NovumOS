@@ -372,15 +372,16 @@ Generate a concise report in Markdown:
         if (data.error) throw new Error(data.error.message);
         return data.choices[0].message.content;
     } else if (geminiKey) {
-        const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        }, 60000);
-        const data = await response.json();
-        if (data.error) throw new Error(data.error.message);
-        return data.candidates[0].content.parts[0].text;
-    }
+    const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    }, 60000);
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+    return data.candidates[0].content.parts[0].text;
+}
+
     throw new Error('Kein OpenAI oder Gemini API Key hinterlegt.');
 }
 
@@ -685,18 +686,19 @@ Benutzeranfrage: ${msg}
             const data = await res.json();
             if (data.error) throw new Error(data.error.message);
             reply = data.choices[0].message.content;
-        } else if (geminiKey) {
-            const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: claudeSystemPrompt }] }] })
-            }, 45000);
-            const data = await res.json();
-            if (data.error) throw new Error(data.error.message);
-            if (!data.candidates || !data.candidates[0]?.content) {
-                throw new Error('Gemini hat keine Antwort geliefert.');
-            }
-            reply = data.candidates[0].content.parts[0].text;
+        } } else if (geminiKey) {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: claudeSystemPrompt }] }] })
+    }, 45000);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    if (!data.candidates || !data.candidates[0]?.content) {
+        throw new Error('Gemini hat keine Antwort geliefert.');
+    }
+    reply = data.candidates[0].content.parts[0].text;
+
         } else { 
             reply = 'Bitte hinterlege deine API-Schlüssel (OpenAI oder Gemini) im Profil.'; 
         }
@@ -753,13 +755,15 @@ async function executeHookGeneration() {
             const data = await res.json();
             reply = data.choices[0].message.content;
         } else if (geminiKey) {
-            const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
-            });
-            const data = await res.json();
-            reply = data.candidates[0].content.parts[0].text;
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    reply = data.candidates[0].content.parts[0].text;
+}
         } else { reply = "Bitte API-Schlüssel im Profil hinterlegen."; }
         outputText.textContent = reply;
     } catch (err) { outputText.textContent = `Fehler: ${err.message}`; }
