@@ -1,281 +1,110 @@
 /* ==========================================================================
-   Novum OS — Intelligence & Co-Writer Engine
-   Developed by NovumAppsSolution
+   NOVUM OS — Main Application Logic (app.js)
+   Brand: NovumAppsSolution
+   Architecture: PWA, LocalStorage-First, Multi-Domain Intelligence
    ========================================================================== */
 
-let activeReportForChat = null;
-let currentReportForHooks = null;
+/* --- GLOBALE VARIABLEN & ZUSTAND --- */
+let currentWorkspaceId = 'all';
 let chatHistory = [];
-let currentWorkspaceId = localStorage.getItem('tw_active_ws') || 'all';
-let searchFilterQuery = '';
+let activeReportForChat = null;
+let scanTimerInterval = null;
 
-/* --- FINELINE SVG ICONS --- */
-const Icons = {
-    pin: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c.11.128.19.278.232.441l.942 3.766a2.25 2.25 0 01-.58 2.023l-1.126 1.126c-.282.282-.44.664-.44 1.063V15.75A2.25 2.25 0 0114.375 18H9.625A2.25 2.25 0 017.375 15.75v-4.015c0-.399-.158-.781-.44-1.063L5.809 9.546a2.25 2.25 0 01-.58-2.023l.942-3.766a1.125 1.125 0 01.378-.58M12 18v3.75"/></svg>`,
-    trash: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>`,
-    zap: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>`,
-    chat: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/></svg>`,
-    chevronDown: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>`,
-    edit: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>`
-};
+// File Upload Speicher (PDF & Text)
+let attachedFileContent = null;
+let attachedFileName = null;
 
+// PDF.js Worker Konfiguration
+if (window['pdfjs-dist/build/pdf']) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+/* --- INITIALISIERUNG BEIM START --- */
 document.addEventListener('DOMContentLoaded', () => {
-    runInitialAppLoader();
-    loadProfileAndTheme();
-    initWorkspaces();
-    loadSavedApiKeys();
+    initDefaultWorkspaces();
     renderWorkspaceUI();
     renderReports();
-    requestNotificationPermission();
 });
 
-/* --- NOTIFICATIONS SYSTEM --- */
-function requestNotificationPermission() {
-    if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
-}
-
-function sendNotification(title, body) {
-    if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, { body: body, icon: './icon-192.png' });
-    }
-}
-
-/* --- INITIAL LAUNCH ANIMATION --- */
-function runInitialAppLoader() {
-    const loader = document.getElementById('novum-app-loader');
-    const loadBar = document.getElementById('app-load-bar');
-    if (!loader || !loadBar) return;
-
-    setTimeout(() => { loadBar.style.width = '100%'; }, 100);
-    setTimeout(() => {
-        loader.style.opacity = '0';
-        setTimeout(() => { loader.style.display = 'none'; }, 700);
-    }, 900);
-}
-
-/* --- THEME & PROFILE ENGINE --- */
-function toggleProfileModal() {
-    document.getElementById('profile-modal').classList.toggle('hidden');
-    checkApiKeyHealth();
-}
-
-function setTheme(themeName) {
-    document.body.setAttribute('data-theme', themeName);
-    localStorage.setItem('novum_theme', themeName);
-}
-
-function loadProfileAndTheme() {
-    const savedTheme = localStorage.getItem('novum_theme') || 'sage';
-    setTheme(savedTheme);
-
-    const userName = localStorage.getItem('novum_user_name') || 'Novum User';
-    const userRole = localStorage.getItem('novum_user_role') || 'Developer';
-
-    const nameInput = document.getElementById('user-name-input');
-    const roleInput = document.getElementById('user-role-input');
-    if (nameInput) nameInput.value = userName;
-    if (roleInput) roleInput.value = userRole;
-
-    const initial = userName.charAt(0).toUpperCase() || 'N';
-    const headerAvatar = document.getElementById('header-avatar');
-    const modalAvatar = document.getElementById('modal-avatar');
-    const headerUserName = document.getElementById('header-user-name');
-
-    if (headerAvatar) headerAvatar.textContent = initial;
-    if (modalAvatar) modalAvatar.textContent = initial;
-    if (headerUserName) headerUserName.textContent = userName;
-}
-
-function saveProfileAndKeys() {
-    const userName = document.getElementById('user-name-input').value.trim() || 'Novum User';
-    const userRole = document.getElementById('user-role-input').value.trim() || 'Developer';
-
-    localStorage.setItem('novum_user_name', userName);
-    localStorage.setItem('novum_user_role', userRole);
-
-    saveApiKeys();
-    loadProfileAndTheme();
-    toggleProfileModal();
-}
-
-/* --- API KEYS & HEALTH CHECK --- */
-function saveApiKeys() {
-    localStorage.setItem('tw_key_serper', document.getElementById('key-serper').value.trim());
-    localStorage.setItem('tw_key_openai', document.getElementById('key-openai').value.trim());
-    localStorage.setItem('tw_key_gemini', document.getElementById('key-gemini').value.trim());
-}
-
-function loadSavedApiKeys() {
-    if (document.getElementById('key-serper')) {
-        document.getElementById('key-serper').value = localStorage.getItem('tw_key_serper') || '';
-        document.getElementById('key-openai').value = localStorage.getItem('tw_key_openai') || '';
-        document.getElementById('key-gemini').value = localStorage.getItem('tw_key_gemini') || '';
-    }
-}
-
-function checkApiKeyHealth() {
-    const serper = localStorage.getItem('tw_key_serper');
-    const openai = localStorage.getItem('tw_key_openai');
-    const gemini = localStorage.getItem('tw_key_gemini');
-    const statusEl = document.getElementById('api-status-badge');
-    if (!statusEl) return;
-
-    if (serper && (openai || gemini)) {
-        statusEl.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
-        statusEl.textContent = "● APIs Aktiv";
-    } else {
-        statusEl.className = "text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30";
-        statusEl.textContent = "● Keys Unvollständig";
-    }
-}
-
-/* --- WORKSPACE MEMORY ENGINE --- */
-function toggleStoryBibleModal() {
-    const modal = document.getElementById('story-bible-modal');
-    if (!modal) return;
-    if (modal.classList.contains('hidden')) {
-        loadStoryBible();
-        modal.classList.remove('hidden');
-    } else {
-        modal.classList.add('hidden');
-    }
-}
-
-function getMemoryKey() { return `novum_memory_ws_${currentWorkspaceId}`; }
-
-function loadStoryBible() {
-    const savedMemory = JSON.parse(localStorage.getItem(getMemoryKey())) || { voice: '', characters: '', progress: '' };
-    document.getElementById('sb-author-voice').value = savedMemory.voice || '';
-    document.getElementById('sb-characters').value = savedMemory.characters || '';
-    document.getElementById('sb-plot-progress').value = savedMemory.progress || '';
-}
-
-function saveStoryBible() {
-    const memoryData = {
-        voice: document.getElementById('sb-author-voice').value.trim(),
-        characters: document.getElementById('sb-characters').value.trim(),
-        progress: document.getElementById('sb-plot-progress').value.trim()
-    };
-    localStorage.setItem(getMemoryKey(), JSON.stringify(memoryData));
-    alert('Workspace Memory erfolgreich aktualisiert!');
-    toggleStoryBibleModal();
-}
-
-/* --- SIDEBAR & WORKSPACES --- */
-function toggleSidebar() {
-    const drawer = document.getElementById('sidebar-drawer');
-    const overlay = document.getElementById('sidebar-overlay');
-    if (!drawer) return;
-    if (drawer.style.transform === 'translateX(0px)' || drawer.style.transform === 'translateX(0)') {
-        drawer.style.transform = 'translateX(-100%)';
-        if (overlay) { overlay.style.opacity = '0'; setTimeout(() => overlay.style.display = 'none', 300); }
-    } else {
-        if (overlay) { overlay.style.display = 'block'; setTimeout(() => overlay.style.opacity = '1', 10); }
-        drawer.style.transform = 'translateX(0)';
+/* --- WORKSPACE MANAGEMENT --- */
+function initDefaultWorkspaces() {
+    if (!localStorage.getItem('tw_workspaces')) {
+        const defaults = [
+            {
+                id: 'ws_dev',
+                name: 'DevTools & Micro-SaaS',
+                icon: '🛠️',
+                keywords: 'Micro-SaaS developer tools Web API PWA productivity tech trends',
+                competitors: 'ProductHunt, IndieHackers, HackerNews',
+                systemPrompt: 'Fokus auf Entwickler-Tools, Micro-SaaS Geschäftschancen, API-Integrationen und PWA Tech-Stack.'
+            },
+            {
+                id: 'ws_booktok',
+                name: 'BookTok & Indie Romance',
+                icon: '📚',
+                keywords: 'BookTok viral romance tropes dark romance indie author self-publishing TikTok trends',
+                competitors: 'Goodreads, TikTok #BookTok, Amazon Bestsellers',
+                systemPrompt: 'Fokus auf Buchmarketing, virale Tropes, Indie-Romance Zielgruppen und BookTok Community-Trends.'
+            }
+        ];
+        localStorage.setItem('tw_workspaces', JSON.stringify(defaults));
     }
 }
 
 function getWorkspaces() {
-    return JSON.parse(localStorage.getItem('tw_workspaces')) || [
-        { id: '1', name: 'NovumAppsSolution — Dev & Micro-SaaS', keywords: 'Micro SaaS developer tools BYOK architecture Stripe Gumroad', competitors: 'Vercel, Supabase' },
-        { id: '2', name: 'BookTok & Indie Romance Intelligence', keywords: 'BookTok viral trends Romance New Adult tropes Amazon Kindle Bestseller', competitors: 'Colleen Hoover, Ana Huang' }
-    ];
-}
-
-function initWorkspaces() {
-    const workspaces = getWorkspaces();
-    const sidebarList = document.getElementById('sidebar-workspace-list');
-    if (!sidebarList) return;
-
-    sidebarList.innerHTML = workspaces.map(w => `
-        <div class="flex items-center gap-1.5">
-            <button onclick="switchWorkspace('${w.id}'); toggleSidebar();" class="flex-1 text-left p-3.5 rounded-2xl border ${currentWorkspaceId === w.id ? 'bg-novum-accent/20 border-novum-accent/40 text-novum-text font-medium' : 'bg-novum-card/60 border-novum-border text-novum-subtext hover:bg-black/5'} transition active:scale-95 flex items-center justify-between text-xs">
-                <span class="truncate">${w.name}</span>
-                <span class="text-[10px] text-novum-subtext">→</span>
-            </button>
-            <button onclick="deleteWorkspace('${w.id}', event)" class="p-3.5 rounded-2xl border border-novum-border bg-novum-card/60 text-novum-subtext hover:text-red-400 transition">
-                ${Icons.trash}
-            </button>
-        </div>
-    `).join('');
-}
-
-function deleteWorkspace(id, event) {
-    if (event) event.stopPropagation();
-    const workspaces = getWorkspaces();
-    if (workspaces.length <= 1) { alert("Mindestens ein Workspace muss erhalten bleiben."); return; }
-    if (!confirm("Workspace wirklich löschen?")) return;
-    localStorage.setItem('tw_workspaces', JSON.stringify(workspaces.filter(w => w.id !== id)));
-    const reports = JSON.parse(localStorage.getItem('tw_reports')) || [];
-    localStorage.setItem('tw_reports', JSON.stringify(reports.filter(r => r.workspaceId !== id)));
-    switchWorkspace('all');
+    return JSON.parse(localStorage.getItem('tw_workspaces')) || [];
 }
 
 function switchWorkspace(id) {
     currentWorkspaceId = id;
-    localStorage.setItem('tw_active_ws', id);
     renderWorkspaceUI();
     renderReports();
-    initWorkspaces();
 }
 
 function renderWorkspaceUI() {
-    const workspaces = getWorkspaces();
-    const allReports = JSON.parse(localStorage.getItem('tw_reports')) || [];
-
-    document.getElementById('stat-ws-count').textContent = workspaces.length;
-    document.getElementById('stat-report-count').textContent = allReports.length;
-    document.getElementById('stat-last-scan').textContent = allReports.length > 0 ? allReports[0].date : 'Kein Scan';
-
-    if (currentWorkspaceId === 'all') {
-        document.getElementById('ws-badge').textContent = 'Global Intelligence';
-        document.getElementById('ws-title').textContent = 'Executive Overview';
-        document.getElementById('ws-keywords').textContent = 'Workspace-übergreifendes Trend-Tracking.';
-        document.getElementById('reports-section-title').textContent = 'Alle Intelligence Reports';
-    } else {
-        const activeWs = workspaces.find(w => w.id === currentWorkspaceId) || workspaces[0];
-        document.getElementById('ws-badge').textContent = `Workspace: ${activeWs.name}`;
-        document.getElementById('ws-title').textContent = activeWs.name;
-        document.getElementById('ws-keywords').textContent = `Keywords: ${activeWs.keywords}`;
-        document.getElementById('reports-section-title').textContent = `Reports für "${activeWs.name}"`;
-    }
-}
-
-function toggleNewWorkspaceModal() { document.getElementById('new-workspace-modal').classList.toggle('hidden'); }
-
-function createWorkspace() {
-    const name = document.getElementById('ws-new-name').value.trim();
-    const keywords = document.getElementById('ws-new-keywords').value.trim();
-    const competitors = document.getElementById('ws-new-competitors')?.value.trim() || '';
-    if (!name || !keywords) { alert('Bitte Name und Keywords eingeben.'); return; }
+    const container = document.getElementById('workspace-tabs');
+    if (!container) return;
 
     const workspaces = getWorkspaces();
-    const newWs = { id: Date.now().toString(), name, keywords, competitors };
-    workspaces.push(newWs);
-    localStorage.setItem('tw_workspaces', JSON.stringify(workspaces));
-    switchWorkspace(newWs.id);
-    toggleNewWorkspaceModal();
-    document.getElementById('ws-new-name').value = '';
-    document.getElementById('ws-new-keywords').value = '';
+    let html = `
+        <button onclick="switchWorkspace('all')" class="px-3 py-1.5 rounded-xl text-xs font-medium transition ${currentWorkspaceId === 'all' ? 'bg-novum-accent text-white font-semibold' : 'bg-black/5 text-novum-subtext hover:text-novum-text'}">
+            🌐 Global (Alle)
+        </button>
+    `;
+
+    workspaces.forEach(ws => {
+        const isActive = ws.id === currentWorkspaceId;
+        html += `
+            <button onclick="switchWorkspace('${ws.id}')" class="px-3 py-1.5 rounded-xl text-xs font-medium transition ${isActive ? 'bg-novum-accent text-white font-semibold' : 'bg-black/5 text-novum-subtext hover:text-novum-text'}">
+                ${ws.icon} ${ws.name}
+            </button>
+        `;
+    });
+
+    container.innerHTML = html;
 }
 
-/* --- UNIVERSAL AI CORE (GEMINI-2.5-FLASH & OPENAI) --- */
+/* --- FETCH ENGINE MIT TIMEOUT --- */
 async function fetchWithTimeout(resource, options = {}, timeout = 60000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     try {
-        const response = await fetch(resource, { ...options, signal: controller.signal });
+        const response = await fetch(resource, {
+            ...options,
+            signal: controller.signal
+        });
         clearTimeout(id);
         return response;
-    } catch (err) {
+    } catch (error) {
         clearTimeout(id);
-        if (err.name === 'AbortError') throw new Error('Zeitüberschreitung: Anfrage dauerte zu lange.');
-        throw err;
+        if (error.name === 'AbortError') {
+            throw new Error('Zeitüberschreitung bei der Anfrage (Timeout nach 60s).');
+        }
+        throw error;
     }
 }
 
+/* --- KI-CALL ENGINE (GEMINI 3.8 / 2.5 / 3.5 FALLBACK + OPENAI) --- */
 async function callAI(promptText, maxTime = 60000) {
     const openaiKey = localStorage.getItem('tw_key_openai');
     const geminiKey = localStorage.getItem('tw_key_gemini');
@@ -291,7 +120,7 @@ async function callAI(promptText, maxTime = 60000) {
         return data.choices[0].message.content;
     } else if (geminiKey) {
         /*
-          Aktuelle Google Gemini Modelle:
+          Aktuelle Google Gemini Modelle im v1beta REST-Endpoint:
           Primary: gemini-3.8-flash
           Fallbacks: gemini-2.5-flash, gemini-3.5-flash
         */
@@ -328,300 +157,32 @@ async function callAI(promptText, maxTime = 60000) {
 
         throw new Error(`Gemini API Fehler: ${lastErrorMessage || 'Kein gültiges Modell erreichbar.'}`);
     }
-    throw new Error('Kein API-Key hinterlegt. Bitte erstelle dir auf Google AI Studio einen kostenlosen Gemini-Key.');
+    throw new Error('Kein API-Key hinterlegt. Bitte hinterlege einen kostenlosen Gemini API-Key in den Einstellungen.');
 }
 
-
-
-/* --- LIVE SCAN ENGINE --- */
-function updateScanProgress(percent, title, subtitle, logText) {
-    document.getElementById('scan-progress-bar').style.width = `${percent}%`;
-    document.getElementById('scan-step-title').textContent = title;
-    document.getElementById('scan-step-subtitle').textContent = subtitle;
-    if (logText) document.getElementById('scan-log-line').textContent = `> ${logText}`;
-}
-
-async function fetchSerperData(keyword, competitors = '') {
+/* --- SERPER.DEV WEB RETRIEVAL --- */
+async function fetchSerperData(queryKeywords, competitorList = '') {
     const serperKey = localStorage.getItem('tw_key_serper');
-    if (!serperKey) throw new Error('Serper.dev API Key fehlt im Profil.');
-    const query = `${keyword} ${competitors ? 'Competitors: ' + competitors : ''} Trends Bestseller`;
-    const res = await fetch('https://google.serper.dev/search', {
+    if (!serperKey) throw new Error('Kein Serper.dev Key gefunden.');
+
+    const fullQuery = `${queryKeywords} ${competitorList}`.trim();
+
+    const response = await fetchWithTimeout('https://google.serper.dev/search', {
         method: 'POST',
-        headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: query, num: 6, gl: 'de', hl: 'de' })
-    });
-    const data = await res.json();
-    let snippets = [];
-    if (data.organic) data.organic.forEach(item => snippets.push(`- ${item.title}: ${item.snippet}`));
-    return snippets.join('\n');
+        headers: {
+            'X-API-KEY': serperKey,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ q: fullQuery, num: 8 })
+    }, 20000);
+
+    const data = await response.json();
+    if (!data.organic) return 'Keine Live-Ergebnisse gefunden.';
+
+    return data.organic.map(item => `Titel: ${item.title}\nLink: ${item.link}\nSnippet: ${item.snippet}`).join('\n\n');
 }
 
-async function startLiveScan() {
-    const serperKey = localStorage.getItem('tw_key_serper');
-    if (!serperKey) { alert('Bitte Serper.dev Key im Profil hinterlegen.'); toggleProfileModal(); return; }
-
-    requestNotificationPermission();
-    const customPrompt = document.getElementById('scan-custom-prompt').value.trim();
-    const aiLang = document.getElementById('ai-response-lang').value;
-    const scanModal = document.getElementById('scan-modal');
-    scanModal.classList.remove('hidden');
-
-    // ⏱️ Countdown für ca. 20 Sekunden starten
-    startScanCountdown(20);
-
-    try {
-        updateScanProgress(25, 'Phase 1: Retrieval', 'Serper.dev Web-Suche läuft...', 'Sammle Live-Daten...');
-        
-        const allReports = JSON.parse(localStorage.getItem('tw_reports')) || [];
-        let rawData = '', reportTitle = '', isGlobal = (currentWorkspaceId === 'all');
-
-        if (isGlobal) {
-            const workspaces = getWorkspaces();
-            rawData = await fetchSerperData(workspaces.map(w => w.keywords).join(' '));
-            reportTitle = `Global Novum Delta — ${new Date().toLocaleDateString()}`;
-        } else {
-            const workspaces = getWorkspaces();
-            const activeWs = workspaces.find(w => w.id === currentWorkspaceId) || workspaces[0];
-            rawData = await fetchSerperData(activeWs.keywords, activeWs.competitors);
-            reportTitle = `${activeWs.name} (Delta Scan)`;
-        }
-
-        updateScanProgress(65, 'Phase 2: LLM Synthesis', 'Verarbeitung via Novum Engine...', 'Generiere SWOT Matrix...');
-
-        const langInst = aiLang === 'de' ? 'Antworte auf Deutsch.' : 'Answer in English.';
-        const prompt = `You are Novum OS, expert intelligence agent by NovumAppsSolution. ${langInst}\n\nData:\n${rawData}\n\n${customPrompt ? 'Focus: ' + customPrompt : ''}\n\nMarkdown Report:\n# Executive Summary\n[Summary]\n\n# SWOT Matrix\n### Strengths & Opportunities (Chancen)\n- [Point]\n### Weaknesses & Threats (Risiken)\n- [Point]\n\n# Quick-Win Action Items (Top 3)\n1. [Item]\n2. [Item]\n3. [Item]`;
-
-        const aiReport = await callAI(prompt, 60000);
-
-        updateScanProgress(100, 'Phase 3: Speichern', 'Report erstellt.', 'Speichere Daten...');
-
-        stopScanCountdown(); // 🛑 Timer stoppen
-
-        const newReport = {
-            id: Date.now().toString(),
-            workspaceId: currentWorkspaceId,
-            workspaceName: isGlobal ? 'Global' : getWorkspaces().find(w => w.id === currentWorkspaceId)?.name,
-            title: reportTitle,
-            date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' + new Date().toLocaleDateString(),
-            content: aiReport,
-            isPinned: false,
-            userNote: ''
-        };
-
-        allReports.unshift(newReport);
-        localStorage.setItem('tw_reports', JSON.stringify(allReports));
-        sendNotification('Novum OS', `Report "${reportTitle}" ist fertig!`);
-
-        setTimeout(() => {
-            renderWorkspaceUI();
-            renderReports();
-            scanModal.classList.add('hidden');
-        }, 600);
-
-    } catch (err) {
-        stopScanCountdown(); // 🛑 Timer bei Fehler stoppen
-        alert(`Fehler: ${err.message}`);
-        scanModal.classList.add('hidden');
-    }
-}
-
-
-/* --- REPORTS FEED & NOTES --- */
-function calculateVolatilityScore(content) {
-    const words = ['boom', 'trend', 'shift', 'hype', 'anstieg', 'bestseller', 'trope', 'explosiv'];
-    let matches = 0, lower = content.toLowerCase();
-    words.forEach(w => { matches += (lower.match(new RegExp(w, 'g')) || []).length; });
-    if (matches > 8) return { label: 'Volatilität: Hoch', class: 'bg-red-500/10 border-red-500/30 text-red-400' };
-    if (matches > 4) return { label: 'Volatilität: Moderat', class: 'bg-novum-accent/15 border-novum-accent/30 text-novum-accent' };
-    return { label: 'Volatilität: Stabil', class: 'bg-black/10 border-novum-border text-novum-subtext' };
-}
-
-function saveReportNote(reportId, noteText) {
-    const allReports = JSON.parse(localStorage.getItem('tw_reports')) || [];
-    const report = allReports.find(r => r.id === reportId);
-    if (report) { report.userNote = noteText; localStorage.setItem('tw_reports', JSON.stringify(allReports)); }
-}
-
-function filterReports(query) { searchFilterQuery = query.toLowerCase(); renderReports(); }
-
-function togglePinReport(id) {
-    const allReports = JSON.parse(localStorage.getItem('tw_reports')) || [];
-    const report = allReports.find(r => r.id === id);
-    if (report) { report.isPinned = !report.isPinned; localStorage.setItem('tw_reports', JSON.stringify(allReports)); renderReports(); }
-}
-
-function deleteReport(id) {
-    if (!confirm("Report wirklich löschen?")) return;
-    const allReports = JSON.parse(localStorage.getItem('tw_reports')) || [];
-    localStorage.setItem('tw_reports', JSON.stringify(allReports.filter(r => r.id !== id)));
-    renderWorkspaceUI(); renderReports();
-}
-
-function parseAndRenderSWOT(content) {
-    const opps = content.match(/### Strengths & Opportunities[\s\S]*?(?=###|#|$)/i);
-    const threats = content.match(/### Weaknesses & Threats[\s\S]*?(?=###|#|$)/i);
-    const actions = content.match(/# Quick-Win Action Items[\s\S]*?(?=#|$)/i);
-    return `
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 my-3">
-            <div class="bg-emerald-500/10 border border-emerald-500/30 p-3.5 rounded-2xl">
-                <span class="text-emerald-500 text-xs font-bold uppercase block mb-1">Chancen (Opportunities)</span>
-                <div class="text-[11px] text-novum-text whitespace-pre-line">${opps ? opps[0].replace(/### Strengths & Opportunities/i, '').trim() : '-'}</div>
-            </div>
-            <div class="bg-red-500/10 border border-red-500/30 p-3.5 rounded-2xl">
-                <span class="text-red-400 text-xs font-bold uppercase block mb-1">Risiken (Threats)</span>
-                <div class="text-[11px] text-novum-text whitespace-pre-line">${threats ? threats[0].replace(/### Weaknesses & Threats/i, '').trim() : '-'}</div>
-            </div>
-        </div>
-        ${actions ? `<div class="bg-novum-accent/10 border border-novum-accent/30 p-3.5 rounded-2xl my-3"><span class="text-novum-accent text-xs font-bold uppercase block mb-1">Quick-Wins</span><div class="text-[11px] text-novum-text whitespace-pre-line">${actions[0].replace(/# Quick-Win Action Items/i, '').trim()}</div></div>` : ''}
-    `;
-}
-
-function renderReports() {
-    const reportsList = document.getElementById('reports-list');
-    let allReports = JSON.parse(localStorage.getItem('tw_reports')) || [];
-    let reports = currentWorkspaceId === 'all' ? allReports : allReports.filter(r => r.workspaceId === currentWorkspaceId);
-    if (searchFilterQuery) reports = reports.filter(r => r.title.toLowerCase().includes(searchFilterQuery) || r.content.toLowerCase().includes(searchFilterQuery));
-    reports.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
-    document.getElementById('report-count-badge').textContent = `${reports.length} Reports`;
-
-    if (reports.length === 0) {
-        reportsList.innerHTML = `<div class="bg-novum-card border border-novum-border p-6 rounded-[24px] text-center text-novum-subtext text-xs">Keine Berichte gefunden.</div>`;
-        return;
-    }
-
-    reportsList.innerHTML = reports.map(r => {
-        const vol = calculateVolatilityScore(r.content);
-        return `
-        <div class="bg-novum-card border border-novum-border hover:border-novum-accent/40 transition-all rounded-[24px] p-5 space-y-3 backdrop-blur-xl shadow-md">
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-[10px] text-novum-accent font-semibold uppercase bg-novum-accent/15 px-2.5 py-0.5 rounded-full border border-novum-accent/30">${r.workspaceName}</span>
-                        ${r.isPinned ? `<span class="text-[10px] text-amber-400 font-semibold uppercase bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/30">Pinned</span>` : ''}
-                        <span class="text-[10px] font-semibold uppercase px-2.5 py-0.5 rounded-full border ${vol.class}">${vol.label}</span>
-                    </div>
-                    <h4 class="font-bold text-novum-text text-base tracking-tight mt-2">${r.title}</h4>
-                    <p class="text-[11px] text-novum-subtext mt-0.5">${r.date}</p>
-                </div>
-                <button onclick="togglePinReport('${r.id}')" class="p-2 rounded-2xl bg-black/5 border border-novum-border ${r.isPinned ? 'text-amber-400 border-amber-400/40 bg-amber-400/10' : 'text-novum-subtext'}">${Icons.pin}</button>
-            </div>
-            <div class="flex items-center gap-2 pt-1 overflow-x-auto no-scrollbar">
-                <button onclick="generateSocialHooks('${r.id}')" class="px-3 py-1.5 rounded-xl bg-novum-accent/15 text-novum-accent border border-novum-accent/30 text-xs font-semibold flex items-center gap-1.5">${Icons.zap}<span>Studio</span></button>
-                <button onclick="openChatForReport('${r.id}')" class="px-3 py-1.5 rounded-xl bg-black/5 text-novum-text border border-novum-border text-xs font-medium flex items-center gap-1.5">${Icons.chat}<span>Chat</span></button>
-                <button onclick="toggleReportDetail('${r.id}')" class="px-3 py-1.5 rounded-xl bg-black/5 text-novum-subtext border border-novum-border text-xs font-medium flex items-center gap-1"><span>Details</span>${Icons.chevronDown}</button>
-                <button onclick="deleteReport('${r.id}')" class="p-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 ml-auto">${Icons.trash}</button>
-            </div>
-            <div id="report-detail-${r.id}" class="hidden pt-3 border-t border-novum-border text-xs text-novum-text bg-black/5 p-4 rounded-2xl space-y-4">
-                ${parseAndRenderSWOT(r.content)}
-                <div class="pt-3 border-t border-novum-border/50 whitespace-pre-wrap">${r.content}</div>
-                <div class="pt-3 border-t border-novum-border/50 space-y-1.5">
-                    <label class="block text-[10px] font-bold uppercase text-novum-subtext">Aktions-Notiz:</label>
-                    <textarea onchange="saveReportNote('${r.id}', this.value)" class="w-full bg-black/5 border border-novum-border rounded-xl p-2.5 text-xs text-novum-text focus:outline-none focus:border-novum-accent h-16 resize-none">${r.userNote || ''}</textarea>
-                </div>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function toggleReportDetail(id) { document.getElementById(`report-detail-${id}`)?.classList.toggle('hidden'); }
-
-/* --- CLAUDE-3.5-SONNET LEVEL CHAT ENGINE --- */
-function openChatForReport(id) {
-    const reports = JSON.parse(localStorage.getItem('tw_reports')) || [];
-    activeReportForChat = reports.find(r => r.id === id);
-    document.getElementById('chat-report-title').textContent = activeReportForChat ? activeReportForChat.title : 'Agent Chat';
-    chatHistory = [{ role: 'assistant', text: `Novum OS Chat bereit für "${activeReportForChat ? activeReportForChat.title : 'Projekt'}".` }];
-    renderChatMessages();
-    document.getElementById('chat-modal').classList.remove('hidden');
-}
-
-function closeChatModal() { document.getElementById('chat-modal').classList.add('hidden'); }
-
-function renderChatMessages() {
-    const container = document.getElementById('chat-messages');
-    container.innerHTML = chatHistory.map(m => `
-        <div class="flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}">
-            <div class="max-w-[85%] p-3.5 rounded-2xl ${m.role === 'user' ? 'bg-novum-accent text-white font-medium shadow-sm' : 'bg-novum-card border border-novum-border text-novum-text shadow-sm'}">${m.text}</div>
-        </div>`).join('');
-    container.scrollTop = container.scrollHeight;
-}
-
-async function sendChatMessage() {
-    const input = document.getElementById('chat-input');
-    const msg = input.value.trim();
-    if (!msg) return;
-
-    const intensity = document.getElementById('chat-intensity')?.value || 'standard';
-    chatHistory.push({ role: 'user', text: msg });
-    input.value = '';
-    renderChatMessages();
-
-    const memory = JSON.parse(localStorage.getItem(getMemoryKey())) || { voice: '', characters: '', progress: '' };
-    const reportSnippet = activeReportForChat ? activeReportForChat.content.slice(0, 2500) : '';
-
-    let intensityPrompt = "Antworte präzise, klar und lösungsorientiert.";
-    if (intensity === 'quick') intensityPrompt = "Antworte sehr kurz und in Stichpunkten.";
-    if (intensity === 'deep') intensityPrompt = "Antworte auf Senior-Architekten-Niveau: tiefgehend, mit vollem Code, klaren Schritten und Logiken.";
-
-    const systemPrompt = `Du bist Novum OS — KI-Agent auf Claude 3.5 Niveau von NovumAppsSolution. Keine Floskeln, starte direkt mit der Antwort.\n\nKontext:\n${reportSnippet}\n\n${intensityPrompt}\n\nAnfrage: ${msg}`;
-
-    try {
-        const reply = await callAI(systemPrompt, 45000);
-        chatHistory.push({ role: 'assistant', text: reply });
-        renderChatMessages();
-    } catch (err) {
-        chatHistory.push({ role: 'assistant', text: `⚠️ Fehler: ${err.message}` });
-        renderChatMessages();
-    }
-}
-
-/* --- HOOK STUDIO --- */
-function generateSocialHooks(reportId) {
-    const reports = JSON.parse(localStorage.getItem('tw_reports')) || [];
-    currentReportForHooks = reports.find(r => r.id === reportId);
-    if (!currentReportForHooks) return;
-    document.getElementById('hook-output-container').classList.add('hidden');
-    document.getElementById('hook-output-text').textContent = '';
-    document.getElementById('hooks-modal').classList.remove('hidden');
-}
-
-function closeHooksModal() { document.getElementById('hooks-modal').classList.add('hidden'); }
-
-async function executeHookGeneration() {
-    if (!currentReportForHooks) return;
-    const formatType = document.getElementById('hook-format-type').value;
-    const outputContainer = document.getElementById('hook-output-container');
-    const outputText = document.getElementById('hook-output-text');
-
-    outputText.textContent = "Generiere Content...";
-    outputContainer.classList.remove('hidden');
-
-    let task = "Erstelle 3 virale Social Media Hooks und ein Pitch-Skript.";
-    if (formatType === 'newsletter') task = "Erstelle eine Newsletter-Kampagne mit Betreffzeilen.";
-    if (formatType === 'blurb') task = "Erstelle einen Produkt-Pitch / Klappentext.";
-
-    try {
-        const reply = await callAI(`Context:\n${currentReportForHooks.content}\n\nTask: ${task}`, 45000);
-        outputText.textContent = reply;
-    } catch (err) {
-        outputText.textContent = `Fehler: ${err.message}`;
-    }
-}
-
-function copyHooksToClipboard() {
-    navigator.clipboard.writeText(document.getElementById('hook-output-text').textContent);
-    alert("In Zwischenablage kopiert!");
-}
-
-/* --- SERVICE WORKER REGISTRATION --- */
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW error', err));
-    });
-}
-
-let scanTimerInterval = null;
-
+/* --- COUNTDOWN TIMER FÜR SCAN --- */
 function startScanCountdown(seconds = 20) {
     let timeLeft = seconds;
     const timerEl = document.getElementById('scan-timer-display');
@@ -630,7 +191,7 @@ function startScanCountdown(seconds = 20) {
         timerEl.textContent = `Geschätzte Dauer: ca. ${timeLeft}s`;
     }
 
-    clearInterval(scanTimerInterval); // Falls noch ein alter Timer läuft
+    clearInterval(scanTimerInterval);
     scanTimerInterval = setInterval(() => {
         timeLeft--;
         if (timerEl) {
@@ -650,3 +211,313 @@ function stopScanCountdown() {
     clearInterval(scanTimerInterval);
 }
 
+function updateScanProgress(percent, phaseTitle, subText, detailText) {
+    const bar = document.getElementById('scan-progress-bar');
+    const phaseEl = document.getElementById('scan-phase-title');
+    const subEl = document.getElementById('scan-sub-text');
+    const detailEl = document.getElementById('scan-detail-text');
+
+    if (bar) bar.style.width = `${percent}%`;
+    if (phaseEl) phaseEl.textContent = phaseTitle;
+    if (subEl) subEl.textContent = subText;
+    if (detailEl) detailEl.textContent = detailText;
+}
+
+/* --- LIVE SCAN ENGINE --- */
+async function startLiveScan() {
+    const serperKey = localStorage.getItem('tw_key_serper');
+    if (!serperKey) {
+        alert('Bitte Serper.dev Key in den Profil-Einstellungen hinterlegen.');
+        toggleProfileModal();
+        return;
+    }
+
+    requestNotificationPermission();
+    const customPromptEl = document.getElementById('scan-custom-prompt');
+    const langEl = document.getElementById('ai-response-lang');
+    const customPrompt = customPromptEl ? customPromptEl.value.trim() : '';
+    const aiLang = langEl ? langEl.value : 'de';
+
+    const scanModal = document.getElementById('scan-modal');
+    if (scanModal) scanModal.classList.remove('hidden');
+
+    // ⏱️ Start 20s Countdown
+    startScanCountdown(20);
+
+    try {
+        updateScanProgress(25, 'Phase 1: Retrieval', 'Serper.dev Web-Suche läuft...', 'Sammle Live-Daten...');
+
+        let rawData = '', reportTitle = '', isGlobal = (currentWorkspaceId === 'all');
+        const workspaces = getWorkspaces();
+
+        if (isGlobal) {
+            const combinedKeywords = workspaces.map(w => w.keywords).join(' ');
+            rawData = await fetchSerperData(combinedKeywords);
+            reportTitle = `Global Novum Delta — ${new Date().toLocaleDateString()}`;
+        } else {
+            const activeWs = workspaces.find(w => w.id === currentWorkspaceId) || workspaces[0];
+            rawData = await fetchSerperData(activeWs.keywords, activeWs.competitors);
+            reportTitle = `${activeWs.name} (Delta Scan)`;
+        }
+
+        updateScanProgress(65, 'Phase 2: LLM Synthesis', 'Verarbeitung via Novum Engine...', 'Generiere SWOT Matrix...');
+
+        const langInst = aiLang === 'de' ? 'Antworte auf Deutsch.' : 'Answer in English.';
+        const prompt = `You are Novum OS, expert intelligence agent by NovumAppsSolution. ${langInst}\n\nData:\n${rawData}\n\n${customPrompt ? 'Focus: ' + customPrompt : ''}\n\nMarkdown Report Format:\n# Executive Summary\n[Summary]\n\n# SWOT Matrix\n### Strengths & Opportunities (Chancen)\n- [Point]\n### Weaknesses & Threats (Risiken)\n- [Point]\n\n# Quick-Win Action Items (Top 3)\n1. [Item]\n2. [Item]\n3. [Item]`;
+
+        const aiReport = await callAI(prompt, 60000);
+
+        updateScanProgress(100, 'Phase 3: Speichern', 'Report erstellt.', 'Speichere Daten...');
+
+        stopScanCountdown();
+
+        const allReports = JSON.parse(localStorage.getItem('tw_reports')) || [];
+        const newReport = {
+            id: Date.now().toString(),
+            workspaceId: currentWorkspaceId,
+            workspaceName: isGlobal ? 'Global' : workspaces.find(w => w.id === currentWorkspaceId)?.name,
+            title: reportTitle,
+            date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' + new Date().toLocaleDateString(),
+            content: aiReport,
+            isPinned: false,
+            userNote: ''
+        };
+
+        allReports.unshift(newReport);
+        localStorage.setItem('tw_reports', JSON.stringify(allReports));
+        sendNotification('Novum OS', `Report "${reportTitle}" ist fertig!`);
+
+        setTimeout(() => {
+            renderReports();
+            if (scanModal) scanModal.classList.add('hidden');
+        }, 600);
+
+    } catch (err) {
+        stopScanCountdown();
+        alert(`Fehler beim Scan: ${err.message}`);
+        if (scanModal) scanModal.classList.add('hidden');
+    }
+}
+
+/* --- REPORTS RENDERING & LOGIK --- */
+function renderReports() {
+    const container = document.getElementById('reports-list');
+    if (!container) return;
+
+    const allReports = JSON.parse(localStorage.getItem('tw_reports')) || [];
+    const filtered = currentWorkspaceId === 'all' 
+        ? allReports 
+        : allReports.filter(r => r.workspaceId === currentWorkspaceId);
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12 text-novum-subtext text-xs">
+                Keine Berichte für diesen Workspace vorhanden. Starte einen Live-Scan.
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    filtered.forEach(rep => {
+        html += `
+            <div class="p-4 bg-novum-card border border-novum-border rounded-2xl mb-3 transition hover:border-novum-accent/50">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-novum-accent/10 text-novum-accent font-semibold">${rep.workspaceName || 'General'}</span>
+                    <span class="text-[10px] text-novum-subtext">${rep.date}</span>
+                </div>
+                <h3 class="text-sm font-bold text-novum-text mb-2">${rep.title}</h3>
+                <div class="text-xs text-novum-subtext line-clamp-3 mb-3 font-mono whitespace-pre-wrap">${rep.content}</div>
+                <div class="flex items-center gap-2 pt-2 border-t border-novum-border/50">
+                    <button onclick="openChatForReport('${rep.id}')" class="text-xs px-3 py-1 rounded-xl bg-novum-accent/10 text-novum-accent hover:bg-novum-accent hover:text-white transition font-medium">
+                        💬 Im Chat analysieren
+                    </button>
+                    <button onclick="deleteReport('${rep.id}')" class="text-xs px-2 py-1 rounded-xl text-red-400 hover:bg-red-500/10 transition ml-auto">
+                        🗑️ Löschen
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function deleteReport(id) {
+    let allReports = JSON.parse(localStorage.getItem('tw_reports')) || [];
+    allReports = allReports.filter(r => r.id !== id);
+    localStorage.setItem('tw_reports', JSON.stringify(allReports));
+    renderReports();
+}
+
+/* --- FILE UPLOAD ENGINE (INCL. PDF.js TEXT-EXTRAKTION) --- */
+async function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    attachedFileName = file.name;
+    const previewContainer = document.getElementById('chat-file-preview');
+    const fileNameEl = document.getElementById('chat-file-name');
+
+    if (fileNameEl) fileNameEl.textContent = `⏳ Verarbeite ${file.name}...`;
+    if (previewContainer) previewContainer.classList.remove('hidden');
+
+    try {
+        if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+            attachedFileContent = await extractTextFromPDF(file);
+        } else {
+            attachedFileContent = await file.text();
+        }
+
+        if (fileNameEl) {
+            fileNameEl.textContent = `📄 ${attachedFileName} (${Math.round(attachedFileContent.length / 1024)} KB Text)`;
+        }
+    } catch (err) {
+        alert(`Fehler beim Einlesen der Datei: ${err.message}`);
+        clearAttachedFile();
+    }
+}
+
+async function extractTextFromPDF(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += `--- Seite ${pageNum} ---\n${pageText}\n\n`;
+    }
+
+    return fullText;
+}
+
+function clearAttachedFile() {
+    attachedFileContent = null;
+    attachedFileName = null;
+    const inputEl = document.getElementById('chat-file-input');
+    if (inputEl) inputEl.value = '';
+    const previewContainer = document.getElementById('chat-file-preview');
+    if (previewContainer) previewContainer.classList.add('hidden');
+}
+
+/* --- CHAT ENGINE & PROMPT SYNTHESIS --- */
+function openChatForReport(reportId) {
+    const allReports = JSON.parse(localStorage.getItem('tw_reports')) || [];
+    activeReportForChat = allReports.find(r => r.id === reportId) || null;
+    
+    chatHistory = [];
+    if (activeReportForChat) {
+        chatHistory.push({ 
+            role: 'assistant', 
+            text: `Ich habe den Bericht **"${activeReportForChat.title}"** geladen. Stelle mir eine Frage dazu oder hänge Notizen/PDFs an!` 
+        });
+    }
+
+    const chatModal = document.getElementById('chat-modal');
+    if (chatModal) chatModal.classList.remove('hidden');
+    renderChatMessages();
+}
+
+function renderChatMessages() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    let html = '';
+    chatHistory.forEach(msg => {
+        const isUser = msg.role === 'user';
+        html += `
+            <div class="flex ${isUser ? 'justify-end' : 'justify-start'} mb-3">
+                <div class="max-w-[85%] p-3 rounded-2xl text-xs ${isUser ? 'bg-novum-accent text-white rounded-br-none' : 'bg-black/10 border border-novum-border text-novum-text rounded-bl-none'} whitespace-pre-wrap font-sans">
+                    ${msg.text}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+    container.scrollTop = container.scrollHeight;
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const msg = input ? input.value.trim() : '';
+    if (!msg && !attachedFileContent) return;
+
+    const intensityEl = document.getElementById('chat-intensity');
+    const intensity = intensityEl ? intensityEl.value : 'standard';
+
+    let userDisplayText = msg;
+    if (attachedFileName) {
+        userDisplayText = `[Angehängte Datei: ${attachedFileName}]\n${msg}`;
+    }
+
+    chatHistory.push({ role: 'user', text: userDisplayText });
+    if (input) input.value = '';
+    renderChatMessages();
+
+    const reportSnippet = activeReportForChat ? activeReportForChat.content.slice(0, 3000) : '';
+
+    let intensityPrompt = "Antworte präzise, klar und lösungsorientiert.";
+    if (intensity === 'quick') intensityPrompt = "Antworte sehr kurz, prägnant und in Stichpunkten.";
+    if (intensity === 'deep') intensityPrompt = "Antworte auf Senior-Architekten-Niveau: tiefgehend, mit vollem Code, klaren Schritten und fundierten Logiken.";
+
+    let fileContext = "";
+    if (attachedFileContent) {
+        fileContext = `\n\n[Angehängtes Dokument / Gedankensammlung (${attachedFileName})]:\n${attachedFileContent}`;
+    }
+
+    const systemPrompt = `Du bist Novum OS — KI-Agent auf Claude 3.5 Niveau von NovumAppsSolution. Keine Floskeln, starte direkt mit der Antwort.\n\nKontext aus aktuellem Bericht:\n${reportSnippet}${fileContext}\n\n${intensityPrompt}\n\nAnfrage: ${msg}`;
+
+    clearAttachedFile();
+
+    try {
+        const reply = await callAI(systemPrompt, 45000);
+        chatHistory.push({ role: 'assistant', text: reply });
+        renderChatMessages();
+    } catch (err) {
+        chatHistory.push({ role: 'assistant', text: `⚠️ Fehler: ${err.message}` });
+        renderChatMessages();
+    }
+}
+
+/* --- SETTINGS & NOTIFICATIONS --- */
+function toggleProfileModal() {
+    const modal = document.getElementById('profile-modal');
+    if (!modal) return;
+    
+    if (modal.classList.contains('hidden')) {
+        document.getElementById('pref-serper-key').value = localStorage.getItem('tw_key_serper') || '';
+        document.getElementById('pref-gemini-key').value = localStorage.getItem('tw_key_gemini') || '';
+        document.getElementById('pref-openai-key').value = localStorage.getItem('tw_key_openai') || '';
+        modal.classList.remove('hidden');
+    } else {
+        modal.classList.add('hidden');
+    }
+}
+
+function saveProfileSettings() {
+    const serper = document.getElementById('pref-serper-key').value.trim();
+    const gemini = document.getElementById('pref-gemini-key').value.trim();
+    const openai = document.getElementById('pref-openai-key').value.trim();
+
+    localStorage.setItem('tw_key_serper', serper);
+    localStorage.setItem('tw_key_gemini', gemini);
+    localStorage.setItem('tw_key_openai', openai);
+
+    alert('Einstellungen erfolgreich gespeichert!');
+    toggleProfileModal();
+}
+
+function requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+function sendNotification(title, body) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, { body, icon: 'icon.png' });
+    }
+}
