@@ -290,19 +290,27 @@ async function callAI(promptText, maxTime = 60000) {
         if (data.error) throw new Error(data.error.message);
         return data.choices[0].message.content;
     } else if (geminiKey) {
-        /* Das stabile, unterstützte Gemini 2.5 Flash Modell */
-        const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+        /* Offizieller, dauerhaft kostenloser v1beta Endpoint */
+        const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{ text: promptText }]
+                }]
+            })
         }, maxTime);
+        
         const data = await res.json();
-        if (data.error) throw new Error(data.error.message);
-        if (!data.candidates || !data.candidates[0]?.content) throw new Error('Keine Antwort von Gemini erhalten.');
+        if (data.error) throw new Error(`Gemini API Fehler: ${data.error.message}`);
+        if (!data.candidates || !data.candidates[0]?.content?.parts[0]?.text) {
+            throw new Error('Keine valide Antwort von Google Gemini erhalten.');
+        }
         return data.candidates[0].content.parts[0].text;
     }
-    throw new Error('Kein OpenAI oder Gemini API Key im Profil hinterlegt.');
+    throw new Error('Kein API Key hinterlegt. Bitte füge einen kostenlosen Gemini Key im Profil ein.');
 }
+
 
 /* --- LIVE SCAN ENGINE --- */
 function updateScanProgress(percent, title, subtitle, logText) {
