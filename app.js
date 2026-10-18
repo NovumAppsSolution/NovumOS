@@ -291,14 +291,14 @@ async function callAI(promptText, maxTime = 60000) {
         return data.choices[0].message.content;
     } else if (geminiKey) {
         /*
-          Liste aller aktuell gültigen Gemini-Modellnamen für generateContent.
-          Die Funktion prüft der Reihe nach, welches Modell dein Key akzeptiert.
+          Aktuelle Google Gemini Modelle:
+          Primary: gemini-3.8-flash
+          Fallbacks: gemini-2.5-flash, gemini-3.5-flash
         */
         const candidateModels = [
-            'gemini-1.5-flash-8b',
-            'gemini-1.5-pro',
-            'gemini-2.0-flash-exp',
-            'gemini-2.0-flash'
+            'gemini-3.8-flash',
+            'gemini-2.5-flash',
+            'gemini-3.5-flash'
         ];
 
         let lastErrorMessage = '';
@@ -315,7 +315,7 @@ async function callAI(promptText, maxTime = 60000) {
                 
                 if (data.error) {
                     lastErrorMessage = data.error.message;
-                    continue; // Probiere nächstes Modell aus der Liste
+                    continue; // Nächstes Modell versuchen
                 }
 
                 if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
@@ -326,10 +326,11 @@ async function callAI(promptText, maxTime = 60000) {
             }
         }
 
-        throw new Error(`Gemini API Fehler: Kein verfügbares Modell gefunden. Letzte Meldung: ${lastErrorMessage}`);
+        throw new Error(`Gemini API Fehler: ${lastErrorMessage || 'Kein gültiges Modell erreichbar.'}`);
     }
-    throw new Error('Kein OpenAI oder Gemini API Key im Profil hinterlegt.');
+    throw new Error('Kein API-Key hinterlegt. Bitte erstelle dir auf Google AI Studio einen kostenlosen Gemini-Key.');
 }
+
 
 
 /* --- LIVE SCAN ENGINE --- */
